@@ -187,7 +187,7 @@ function readCachedSnapshot(projectId: string): DashboardSnapshot | null {
     const cached = window.localStorage.getItem(snapshotCacheKey(projectId));
     if (!cached) return null;
     const snapshot = JSON.parse(cached) as DashboardSnapshot;
-    if (!Array.isArray(snapshot.releases) || !snapshot.releases.length || Number.isNaN(Date.parse(snapshot.updatedAt))) return null;
+    if (!Array.isArray(snapshot.releases) || Number.isNaN(Date.parse(snapshot.updatedAt))) return null;
     if (snapshot.stars !== undefined && parseGitHubStarCount({ stargazers_count: snapshot.stars }) === null) return null;
     const isValid = snapshot.releases.every((release) => (
       typeof release.version === 'string'
@@ -636,7 +636,6 @@ export default function Home() {
           ...(project.assets ? { assets } : {}),
         }];
       }).sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt));
-      if (metrics.length === 0) throw new Error('No tracked assets found');
       if (requestId !== requestSequence.current) return;
 
       const updatedAt = new Date().toISOString();
@@ -845,7 +844,9 @@ export default function Home() {
     ? 'Loading live GitHub data…'
     : status === 'limited'
       ? 'GitHub rate limit reached; retry is automatic'
-      : 'GitHub data is temporarily unavailable';
+      : status === 'ready' && releases.length === 0
+        ? 'This repository has no release assets to count'
+        : 'GitHub data is temporarily unavailable';
   const repositoryUrl = `https://github.com/${project.owner}/${project.repo}`;
   const stargazersUrl = `${repositoryUrl}/stargazers`;
   const stars = snapshot?.stars;
