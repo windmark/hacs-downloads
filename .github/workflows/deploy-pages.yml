@@ -37,16 +37,28 @@ jobs:
 
       - name: Commit download history
         if: github.event_name != 'push'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if git diff --quiet -- public/download-history.json; then
-            echo "Download history is already current."
-            exit 0
-          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add public/download-history.json
-          git commit -m "chore: capture download history"
-          git push
+          for attempt in 1 2 3; do
+            if git diff --quiet -- public/download-history.json; then
+              echo "Download history is already current."
+              exit 0
+            fi
+            git add public/download-history.json
+            git commit -m "chore: capture download history"
+            if git push origin HEAD:main; then
+              exit 0
+            fi
+            echo "Push failed; retrying against the latest main (attempt $attempt of 3)."
+            git fetch origin main
+            git reset --hard origin/main
+            node scripts/capture-download-history.mjs
+          done
+          echo "Could not push download history after 3 attempts." >&2
+          exit 1
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v6
