@@ -1,85 +1,11 @@
 [
   {
-    "id": "oralb-ha",
-    "name": "Oral-B Live",
-    "owner": "thomasgregg",
-    "repo": "oralb-ha",
-    "assetName": "oralb_live.zip",
-    "mark": "OB",
-    "description": "the Oral-B Live Home Assistant integration"
-  },
-  {
-    "id": "elco-aerotop",
-    "name": "ELCO Aerotop",
-    "owner": "thomasgregg",
-    "repo": "elco-aerotop",
-    "assetName": "elco_aerotop.zip",
-    "mark": "EA",
-    "description": "the ELCO Aerotop Home Assistant integration"
-  },
-  {
-    "id": "intex-ha",
-    "name": "Intex SX2100",
-    "owner": "thomasgregg",
-    "repo": "intex-ha",
-    "assetName": "intex_sx2100.zip",
-    "mark": "IX",
-    "description": "the Intex SX2100 Pool Pump Home Assistant integration"
-  },
-  {
-    "id": "frigate-delivery-card",
-    "name": "Frigate Delivery Card",
-    "owner": "thomasgregg",
-    "repo": "frigate-delivery-card",
-    "assetName": "frigate-delivery-card.js",
-    "mark": "FD",
-    "description": "the Frigate Delivery Home Assistant dashboard card"
-  },
-  {
-    "id": "saltwatch-card",
-    "name": "SaltWatch Card",
-    "owner": "thomasgregg",
-    "repo": "saltwatch-card",
-    "assetName": "saltwatch-card.js",
-    "mark": "SW",
-    "description": "the SaltWatch Home Assistant dashboard card"
-  },
-  {
-    "id": "saltwatch",
-    "name": "SaltWatch Firmware",
-    "owner": "thomasgregg",
-    "repo": "saltwatch",
-    "assets": [
-      {
-        "id": "factory",
-        "label": "Factory image",
-        "assetNameTemplate": "saltwatch-{version}.factory.bin"
-      },
-      {
-        "id": "ota",
-        "label": "OTA image",
-        "assetNameTemplate": "saltwatch-{version}.ota.bin"
-      }
-    ],
-    "mark": "SF",
-    "description": "the SaltWatch ESPHome firmware"
-  },
-  {
-    "id": "ring-view",
-    "name": "Ring View",
-    "owner": "thomasgregg",
-    "repo": "ring-view",
-    "assetName": "ring-view.js",
-    "mark": "RV",
-    "description": "the Ring View Home Assistant dashboard card"
-  },
-  {
-    "id": "ring-webrtc-backend-patch",
-    "name": "Ring WebRTC Backend Patch",
-    "owner": "thomasgregg",
-    "repo": "ring-webrtc-backend-patch",
-    "assetName": "ring_webrtc_backend_patch.zip",
-    "mark": "RW",
-    "description": "the Ring WebRTC backend patch for Home Assistant"
+    "id": "ef-powerocean-tcpmodbus",
+    "name": "EF-PowerOcean-TcpModbus",
+    "owner": "MaxGrmm",
+    "repo": "EF-PowerOcean-TcpModbus",
+    "assetName": "ef_powerocean_tcpmodbus.zip",
+    "mark": "EF",
+    "description": "the EF-PowerOcean-TcpModbus Home Assistant integration"
   }
 ]
