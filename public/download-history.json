@@ -6824,6 +6824,17 @@
           "releases": {}
         }
       }
+    },
+    {
+      "capturedAt": "2026-10-04T07:00:37.474Z",
+      "projects": {
+        "ef-powerocean-tcpmodbus": {
+          "total": 0,
+          "releases": {
+            "v2.8.0": 0
+          }
+        }
+      }
     }
   ]
 }
