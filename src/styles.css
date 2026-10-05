@@ -143,10 +143,11 @@ a { color: inherit; text-decoration: none; }
 .github-stars.is-unavailable svg { fill: none; }
 
 .hero { align-items: end; display: flex; justify-content: space-between; padding: 68px 0 44px; }
+.hero-actions { align-items: center; display: flex; gap: 22px; margin-bottom: 5px; }
 .eyebrow { align-items: center; color: var(--teal-dark); display: flex; font-size: 10px; font-weight: 800; gap: 7px; letter-spacing: .13em; margin: 0 0 14px; text-transform: uppercase; }
 .hero h1 { font-size: clamp(43px, 6vw, 78px); letter-spacing: -.065em; line-height: .96; margin: 0; max-width: 760px; }
 .hero-copy { color: var(--muted); font-size: 15px; line-height: 1.65; margin: 24px 0 0; max-width: 520px; }
-.hero-refresh { align-items: start; border-left: 1px solid var(--line); display: grid; gap: 4px; margin-bottom: 5px; min-width: 170px; padding: 4px 0 4px 22px; }
+.hero-refresh { align-items: start; border-left: 1px solid var(--line); display: grid; gap: 4px; min-width: 170px; padding: 4px 0 4px 22px; }
 .hero-refresh > span { color: var(--muted); font-size: 10px; }
 .hero-refresh > strong { font-size: 16px; letter-spacing: -.02em; }
 .hero-refresh button { align-items: center; background: transparent; border: 0; color: var(--teal-dark); cursor: pointer; display: flex; font-size: 11px; font-weight: 700; gap: 6px; margin: 7px 0 0; padding: 0; }
@@ -241,7 +242,6 @@ a { color: inherit; text-decoration: none; }
 .card-heading { align-items: start; display: flex; justify-content: space-between; }
 .card-heading h2 { font-size: 20px; letter-spacing: -.035em; margin: 0; }
 .card-heading .eyebrow { margin-bottom: 7px; }
-.release-chart-controls { align-items: center; display: flex; flex-wrap: wrap; gap: 12px; justify-content: flex-end; }
 .prerelease-toggle { align-items: center; color: var(--muted); cursor: pointer; display: flex; font-size: 10px; font-weight: 700; gap: 6px; white-space: nowrap; }
 .prerelease-toggle input { accent-color: var(--teal-dark); height: 14px; margin: 0; width: 14px; }
 .segmented-control { background: #eef3f6; border-radius: 9px; display: flex; padding: 3px; }
@@ -338,6 +338,7 @@ footer { color: #8a98a7; display: flex; font-size: 9px; justify-content: space-b
 @media (max-width: 820px) {
   .stats-grid { grid-template-columns: repeat(2, 1fr); }
   .hero { align-items: start; flex-direction: column; gap: 30px; }
+  .hero-actions { justify-content: flex-end; margin-bottom: 0; width: 100%; }
   .hero-refresh { display: none; }
   .growth-layout { grid-template-columns: 1fr; }
   .growth-summary { border-left: 0; border-top: 1px solid var(--line); display: grid; gap: 2px 14px; grid-template-columns: auto 1fr; padding: 17px 0 0; }

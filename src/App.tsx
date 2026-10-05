@@ -50,7 +50,7 @@ type ReleaseMetric = {
   publishedAt: string;
   size: number;
   url: string;
-  prerelease?: boolean;
+  prerelease: boolean;
   assets?: Record<string, {
     downloads: number;
     size: number;
@@ -171,7 +171,7 @@ function getInitialProjectId() {
 }
 
 function snapshotCacheKey(projectId: string) {
-  return `hacs-downloads-snapshot-${projectId}-v2`;
+  return `hacs-downloads-snapshot-${projectId}-v3`;
 }
 
 function readRateLimitReset(): number | null {
@@ -198,7 +198,7 @@ function readCachedSnapshot(projectId: string): DashboardSnapshot | null {
       && typeof release.publishedAt === 'string'
       && typeof release.size === 'number'
       && typeof release.url === 'string'
-      && (release.prerelease === undefined || typeof release.prerelease === 'boolean')
+      && typeof release.prerelease === 'boolean'
       && (release.assets === undefined || (
         release.assets !== null
         && typeof release.assets === 'object'
@@ -925,31 +925,41 @@ export default function Home() {
           <h1>HACS downloads,<br />made visible.</h1>
           <p className="hero-copy">A clear, live view of release asset downloads across every tracked release of <strong>{project.name}</strong>.</p>
         </div>
-        <div className="hero-refresh">
-          <span>Last refreshed</span>
-          <strong>{timeAgo(lastUpdated)}</strong>
-          <button
-            type="button"
-            className={`refresh-button state-${refreshState}`}
-            onClick={() => void refresh(true)}
-            aria-label={`Refresh ${project.name} download data`}
-            disabled={refreshState === 'refreshing' || status === 'limited'}
-          >
-            {refreshState === 'updated'
-              ? <Check size={14} aria-hidden="true" />
-              : <RefreshCw size={14} className={refreshState === 'refreshing' ? 'is-spinning' : ''} aria-hidden="true" />}
-            <span aria-live="polite">
-              {status === 'limited' && rateLimitReset
-                ? `Retry at ${formatTime(rateLimitReset)}`
-                : refreshState === 'refreshing'
-                ? 'Refreshing…'
-                : refreshState === 'updated'
-                  ? 'Updated'
-                  : refreshState === 'error'
-                    ? 'Try again'
-                    : 'Refresh data'}
-            </span>
-          </button>
+        <div className="hero-actions">
+          <label className="prerelease-toggle">
+            <input
+              checked={includePrereleases}
+              onChange={(event) => setIncludePrereleases(event.target.checked)}
+              type="checkbox"
+            />
+            Include pre-releases
+          </label>
+          <div className="hero-refresh">
+            <span>Last refreshed</span>
+            <strong>{timeAgo(lastUpdated)}</strong>
+            <button
+              type="button"
+              className={`refresh-button state-${refreshState}`}
+              onClick={() => void refresh(true)}
+              aria-label={`Refresh ${project.name} download data`}
+              disabled={refreshState === 'refreshing' || status === 'limited'}
+            >
+              {refreshState === 'updated'
+                ? <Check size={14} aria-hidden="true" />
+                : <RefreshCw size={14} className={refreshState === 'refreshing' ? 'is-spinning' : ''} aria-hidden="true" />}
+              <span aria-live="polite">
+                {status === 'limited' && rateLimitReset
+                  ? `Retry at ${formatTime(rateLimitReset)}`
+                  : refreshState === 'refreshing'
+                  ? 'Refreshing…'
+                  : refreshState === 'updated'
+                    ? 'Updated'
+                    : refreshState === 'error'
+                      ? 'Try again'
+                      : 'Refresh data'}
+              </span>
+            </button>
+          </div>
         </div>
       </section>
 
@@ -1037,19 +1047,9 @@ export default function Home() {
               <h2 id="release-performance-title">Release downloads by version</h2>
               {hasAssetBreakdown && secondaryAsset && <AssetLegend assets={[primaryAsset, secondaryAsset]} />}
             </div>
-            <div className="release-chart-controls">
-              <label className="prerelease-toggle">
-                <input
-                  checked={includePrereleases}
-                  onChange={(event) => setIncludePrereleases(event.target.checked)}
-                  type="checkbox"
-                />
-                Include pre-releases
-              </label>
-              <div className="segmented-control" aria-label="Chart range">
-                <button className={range === 'recent' ? 'active' : ''} onClick={() => setRange('recent')} type="button">Recent 5</button>
-                <button className={range === 'all' ? 'active' : ''} onClick={() => setRange('all')} type="button">All</button>
-              </div>
+            <div className="segmented-control" aria-label="Chart range">
+              <button className={range === 'recent' ? 'active' : ''} onClick={() => setRange('recent')} type="button">Recent 5</button>
+              <button className={range === 'all' ? 'active' : ''} onClick={() => setRange('all')} type="button">All</button>
             </div>
           </div>
           {releaseComparison && (
