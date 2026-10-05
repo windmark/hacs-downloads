@@ -2,6 +2,7 @@ export type ComparableRelease = {
   version: string;
   downloads: number;
   publishedAt: string;
+  prerelease?: boolean;
 };
 
 export type ReleaseComparison = {
@@ -14,6 +15,13 @@ export type ReleaseComparison = {
 };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+export function filterPrereleases<T extends { prerelease?: boolean }>(
+  releases: readonly T[],
+  includePrereleases: boolean,
+): T[] {
+  return includePrereleases ? [...releases] : releases.filter((release) => !release.prerelease);
+}
 
 export function buildReleaseComparison(
   releases: readonly ComparableRelease[],

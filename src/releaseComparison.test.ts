@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildReleaseComparison, formatReleaseAge } from './releaseComparison';
+import { buildReleaseComparison, filterPrereleases, formatReleaseAge } from './releaseComparison';
 
 const releases = [
   { version: 'v3', downloads: 157, publishedAt: '2026-09-14T08:00:00Z' },
@@ -32,6 +32,18 @@ describe('buildReleaseComparison', () => {
 
   it('returns no comparison until an earlier release exists', () => {
     expect(buildReleaseComparison(releases.slice(0, 1))).toBeNull();
+  });
+});
+
+describe('filterPrereleases', () => {
+  it('keeps prereleases when enabled and excludes them when disabled', () => {
+    const releasesWithTypes = [
+      { ...releases[0], prerelease: false },
+      { ...releases[1], prerelease: true },
+    ];
+
+    expect(filterPrereleases(releasesWithTypes, true)).toEqual(releasesWithTypes);
+    expect(filterPrereleases(releasesWithTypes, false)).toEqual([releasesWithTypes[0]]);
   });
 });
 

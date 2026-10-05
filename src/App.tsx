@@ -21,7 +21,7 @@ import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useSta
 import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react';
 import projectConfigs from './projects.json';
 import { formatGitHubStarCount, parseGitHubStarCount } from './github';
-import { buildReleaseComparison, formatReleaseAge } from './releaseComparison';
+import { buildReleaseComparison, filterPrereleases, formatReleaseAge } from './releaseComparison';
 
 type AssetMatcher =
   | { assetName: string; assetNameTemplate?: never }
@@ -50,6 +50,7 @@ type ReleaseMetric = {
   publishedAt: string;
   size: number;
   url: string;
+  prerelease?: boolean;
   assets?: Record<string, {
     downloads: number;
     size: number;
@@ -61,6 +62,7 @@ type GitHubRelease = {
   published_at: string | null;
   html_url: string;
   draft: boolean;
+  prerelease: boolean;
   assets: Array<{
     name: string;
     download_count: number;
@@ -81,6 +83,7 @@ type DashboardSnapshot = {
 type HistoryProjectSnapshot = {
   total: number;
   releases: Record<string, number>;
+  prereleases?: string[];
   assets?: Record<string, number>;
   releaseAssets?: Record<string, Record<string, number>>;
 };
@@ -195,6 +198,7 @@ function readCachedSnapshot(projectId: string): DashboardSnapshot | null {
       && typeof release.publishedAt === 'string'
       && typeof release.size === 'number'
       && typeof release.url === 'string'
+      && (release.prerelease === undefined || typeof release.prerelease === 'boolean')
       && (release.assets === undefined || (
         release.assets !== null
         && typeof release.assets === 'object'
@@ -541,6 +545,7 @@ export default function Home() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(() => initialSnapshot ? new Date(initialSnapshot.updatedAt) : null);
   const [rateLimitReset, setRateLimitReset] = useState<number | null>(initialRateLimitReset);
   const [range, setRange] = useState<'all' | 'recent'>('recent');
+  const [includePrereleases, setIncludePrereleases] = useState(true);
   const [growthRange, setGrowthRange] = useState<'daily' | 'weekly'>('daily');
   const [history, setHistory] = useState<DownloadHistory | null>(null);
   const [historyStatus, setHistoryStatus] = useState<'loading' | 'ready' | 'error'>('loading');
@@ -633,6 +638,7 @@ export default function Home() {
           publishedAt: release.published_at,
           size: Object.values(assets).reduce((sum, asset) => sum + asset.size, 0),
           url: release.html_url,
+          prerelease: release.prerelease,
           ...(project.assets ? { assets } : {}),
         }];
       }).sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt));
@@ -734,9 +740,35 @@ export default function Home() {
     }
   };
 
-  const releases = snapshot?.releases ?? [];
+  const allReleases = snapshot?.releases ?? [];
+  const prereleaseVersions = useMemo(() => new Set([
+    ...allReleases.filter((release) => release.prerelease).map((release) => release.version),
+    ...(history?.snapshots ?? []).flatMap((historySnapshot) => {
+      const versions = historySnapshot.projects[project.id]?.prereleases;
+      return Array.isArray(versions) ? versions.filter((version): version is string => typeof version === 'string') : [];
+    }),
+  ]), [allReleases, history, project.id]);
+  const releases = useMemo(
+    () => filterPrereleases(allReleases, includePrereleases),
+    [allReleases, includePrereleases],
+  );
   const trackedAssets = useMemo(() => projectAssets(project), [project]);
   const hasAssetBreakdown = project.assets !== undefined;
+  const isIncludedVersion = (version: string) => includePrereleases || !prereleaseVersions.has(version);
+  const historyReleaseTotal = (projectSnapshot: HistoryProjectSnapshot) => (
+    Object.entries(projectSnapshot.releases).reduce((sum, [version, downloads]) => (
+      sum + (isIncludedVersion(version) ? downloads : 0)
+    ), 0)
+  );
+  const historyAssetTotals = (projectSnapshot: HistoryProjectSnapshot) => {
+    if (!projectSnapshot.releaseAssets) return undefined;
+    return Object.fromEntries(trackedAssets.map((asset) => [
+      asset.id,
+      Object.entries(projectSnapshot.releaseAssets ?? {}).reduce((sum, [version, assets]) => (
+        sum + (isIncludedVersion(version) ? assets[asset.id] ?? 0 : 0)
+      ), 0),
+    ]));
+  };
   const assetTotals = useMemo(() => Object.fromEntries(trackedAssets.map((asset) => [
     asset.id,
     releases.reduce((sum, release) => sum + (release.assets?.[asset.id]?.downloads ?? 0), 0),
@@ -758,11 +790,6 @@ export default function Home() {
 
   const metricGrowth = useMemo(() => {
     if (!summary) return null;
-    const snapshotTotal = (projectSnapshot: HistoryProjectSnapshot) => {
-      if (!hasAssetBreakdown) return projectSnapshot.total;
-      if (!projectSnapshot.assets) return Number.NaN;
-      return trackedAssets.reduce((sum, asset) => sum + (projectSnapshot.assets?.[asset.id] ?? 0), 0);
-    };
     const snapshotReleaseTotal = (projectSnapshot: HistoryProjectSnapshot, version: string) => {
       if (!hasAssetBreakdown) return projectSnapshot.releases[version] ?? 0;
       const releaseAssets = projectSnapshot.releaseAssets?.[version];
@@ -771,43 +798,46 @@ export default function Home() {
     };
     const activeReleaseAverage = (projectSnapshot: HistoryProjectSnapshot) => {
       if (!hasAssetBreakdown) {
-        const downloadedReleases = Object.values(projectSnapshot.releases).filter((downloads) => downloads > 0);
-        return downloadedReleases.length ? Math.round(projectSnapshot.total / downloadedReleases.length) : 0;
+        const downloadedReleases = Object.entries(projectSnapshot.releases)
+          .filter(([version, downloads]) => isIncludedVersion(version) && downloads > 0);
+        const total = downloadedReleases.reduce((sum, [, downloads]) => sum + downloads, 0);
+        return downloadedReleases.length ? Math.round(total / downloadedReleases.length) : 0;
       }
       if (!projectSnapshot.releaseAssets) return Number.NaN;
-      const downloadedReleases = Object.values(projectSnapshot.releaseAssets)
+      const downloadedReleases = Object.entries(projectSnapshot.releaseAssets)
+        .filter(([version]) => isIncludedVersion(version))
+        .map(([, releaseAssets]) => releaseAssets)
         .map((releaseAssets) => trackedAssets.reduce((sum, asset) => sum + (releaseAssets[asset.id] ?? 0), 0))
         .filter((downloads) => downloads > 0);
       const total = downloadedReleases.reduce((sum, downloads) => sum + downloads, 0);
       return downloadedReleases.length ? Math.round(total / downloadedReleases.length) : 0;
     };
     return {
-      total: calculateMetricGrowth(history, project.id, snapshotTotal),
+      total: calculateMetricGrowth(history, project.id, historyReleaseTotal),
       latest: calculateMetricGrowth(history, project.id, (projectSnapshot) => snapshotReleaseTotal(projectSnapshot, summary.latest.version)),
       leader: calculateMetricGrowth(history, project.id, (projectSnapshot) => snapshotReleaseTotal(projectSnapshot, summary.leader.version)),
       average: calculateMetricGrowth(history, project.id, activeReleaseAverage),
       assets: Object.fromEntries(trackedAssets.map((asset) => [
         asset.id,
-        calculateMetricGrowth(history, project.id, (projectSnapshot) => projectSnapshot.assets?.[asset.id] ?? Number.NaN),
+        calculateMetricGrowth(history, project.id, (projectSnapshot) => historyAssetTotals(projectSnapshot)?.[asset.id] ?? Number.NaN),
       ])),
     };
-  }, [hasAssetBreakdown, history, project.id, summary, trackedAssets]);
+  }, [hasAssetBreakdown, history, includePrereleases, prereleaseVersions, project.id, summary, trackedAssets]);
 
   const growthSeries = useMemo(() => buildGrowthSeries(
     history,
     project.id,
     growthRange,
     (projectSnapshot) => {
-      if (!hasAssetBreakdown) return projectSnapshot.total;
-      if (!projectSnapshot.assets) return Number.NaN;
-      return trackedAssets.reduce((sum, asset) => sum + (projectSnapshot.assets?.[asset.id] ?? 0), 0);
+      if (!hasAssetBreakdown) return historyReleaseTotal(projectSnapshot);
+      const assets = historyAssetTotals(projectSnapshot);
+      if (!assets) return Number.NaN;
+      return trackedAssets.reduce((sum, asset) => sum + (assets[asset.id] ?? 0), 0);
     },
     hasAssetBreakdown
-      ? (projectSnapshot) => projectSnapshot.assets
-        ? Object.fromEntries(trackedAssets.map((asset) => [asset.id, projectSnapshot.assets?.[asset.id] ?? 0]))
-        : undefined
+      ? historyAssetTotals
       : undefined,
-  ), [growthRange, hasAssetBreakdown, history, project.id, trackedAssets]);
+  ), [growthRange, hasAssetBreakdown, history, includePrereleases, prereleaseVersions, project.id, trackedAssets]);
   const maxGrowth = Math.max(1, ...growthSeries.map((point) => Math.abs(point.value)));
   const latestGrowth = growthSeries.at(-1) ?? null;
   const previousGrowth = growthSeries.at(-2) ?? null;
@@ -1007,9 +1037,19 @@ export default function Home() {
               <h2 id="release-performance-title">Release downloads by version</h2>
               {hasAssetBreakdown && secondaryAsset && <AssetLegend assets={[primaryAsset, secondaryAsset]} />}
             </div>
-            <div className="segmented-control" aria-label="Chart range">
-              <button className={range === 'recent' ? 'active' : ''} onClick={() => setRange('recent')} type="button">Recent 5</button>
-              <button className={range === 'all' ? 'active' : ''} onClick={() => setRange('all')} type="button">All</button>
+            <div className="release-chart-controls">
+              <label className="prerelease-toggle">
+                <input
+                  checked={includePrereleases}
+                  onChange={(event) => setIncludePrereleases(event.target.checked)}
+                  type="checkbox"
+                />
+                Include pre-releases
+              </label>
+              <div className="segmented-control" aria-label="Chart range">
+                <button className={range === 'recent' ? 'active' : ''} onClick={() => setRange('recent')} type="button">Recent 5</button>
+                <button className={range === 'all' ? 'active' : ''} onClick={() => setRange('all')} type="button">All</button>
+              </div>
             </div>
           </div>
           {releaseComparison && (
