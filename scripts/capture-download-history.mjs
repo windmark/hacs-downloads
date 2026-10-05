@@ -49,16 +49,19 @@ async function fetchProject(project) {
     return [[release.tag_name, {
       assets,
       total: Object.values(assets).reduce((sum, downloads) => sum + downloads, 0),
+      prerelease: release.prerelease === true,
     }]];
   });
   const releases = Object.fromEntries(releaseEntries.map(([tag, release]) => [tag, release.total]));
+  const prereleases = releaseEntries.flatMap(([tag, release]) => release.prerelease ? [tag] : []);
   const total = Object.values(releases).reduce((sum, downloads) => sum + downloads, 0);
 
-  if (!project.assets) return { total, releases };
+  if (!project.assets) return { total, releases, prereleases };
 
   return {
     total,
     releases,
+    prereleases,
     assets: Object.fromEntries(trackedAssets.map((asset) => [
       asset.id,
       releaseEntries.reduce((sum, [, release]) => sum + (release.assets[asset.id] ?? 0), 0),

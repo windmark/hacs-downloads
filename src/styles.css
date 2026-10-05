@@ -241,6 +241,9 @@ a { color: inherit; text-decoration: none; }
 .card-heading { align-items: start; display: flex; justify-content: space-between; }
 .card-heading h2 { font-size: 20px; letter-spacing: -.035em; margin: 0; }
 .card-heading .eyebrow { margin-bottom: 7px; }
+.release-chart-controls { align-items: center; display: flex; flex-wrap: wrap; gap: 12px; justify-content: flex-end; }
+.prerelease-toggle { align-items: center; color: var(--muted); cursor: pointer; display: flex; font-size: 10px; font-weight: 700; gap: 6px; white-space: nowrap; }
+.prerelease-toggle input { accent-color: var(--teal-dark); height: 14px; margin: 0; width: 14px; }
 .segmented-control { background: #eef3f6; border-radius: 9px; display: flex; padding: 3px; }
 .segmented-control button { background: transparent; border: 0; border-radius: 7px; color: var(--muted); cursor: pointer; font-size: 10px; font-weight: 700; padding: 7px 10px; }
 .segmented-control button.active { background: white; box-shadow: 0 3px 9px rgb(16 37 63 / 9%); color: var(--ink); }
