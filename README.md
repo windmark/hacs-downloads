@@ -22,6 +22,11 @@ HACS Download Analytics turns the download counters exposed by GitHub Releases i
 - Pre-releases are detected from GitHub's flag and from common tag patterns such as `-beta.3`, `rc1` or `b5`.
 - Compare releases fairly with downloads per day since release, see a multi-version share donut, and track how much of the past week's downloads went to the latest release.
 - Sort the release table, export the current view as CSV, and see when the latest release is projected to pass the previous record at its current pace.
+- Reconstruct each release's launch (day 0, day 1, day 2, days 3–6, day 7+) from daily snapshots, with milestone times, a first-week total projected from earlier releases, and how long it took to win most daily downloads.
+- Split daily downloads by version to see how quickly users upgrade, with release markers and unusual spikes flagged on the velocity chart.
+- Estimate active installs from typical first-week downloads, plus the share of downloads on older versions, release cadence and hotfixes, beta-tester pool size, and the next download milestone with an ETA.
+- Follow community and quality signals: star history, issues opened within 72 hours of a release, release-note reactions, and Home Assistant's opt-in active-installation counts when the integration reports them.
+- Expand any release in the table for its cumulative curve and lifecycle details, and compare all tracked projects in a portfolio view when more than one is configured.
 - See each selected repository's GitHub star count beside its repository link.
 - Compare 24-hour and 7-day growth for totals, latest releases, leading releases, and active-release averages.
 - Explore daily and weekly download velocity as snapshot history accumulates, with stacked asset sections for multi-asset projects.
@@ -30,6 +35,12 @@ HACS Download Analytics turns the download counters exposed by GitHub Releases i
 - Cache successful responses locally to reduce GitHub API usage.
 - Preserve cached data and retry automatically when GitHub rate limits are reached.
 - Deploy as a fully static site with the included GitHub Pages workflow.
+
+## Daily metadata
+
+The scheduled workflow also writes `public/project-meta.json` with release publish dates, daily star counts (backfilled from GitHub's `starred_at` timestamps for repositories with up to 5,000 stars), issues opened in the retention window, and Home Assistant analytics installs. Each source fails independently and keeps its previous data. The Home Assistant domain defaults to the tracked `.zip` name without the extension; set `"haDomain"` on a project in `src/projects.json` when it differs.
+
+Launch curves need a snapshot within 36 hours of a release, so they are available only for releases published after daily tracking started. Values between snapshots are linearly interpolated from zero at publish time.
 
 ## How it works
 

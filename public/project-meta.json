@@ -1,0 +1,443 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-10-10T17:19:57.420Z",
+  "projects": {
+    "ef-powerocean-tcpmodbus": {
+      "releases": {
+        "v2.9.0-beta.9": "2026-10-10T13:26:14Z",
+        "v2.9.0-beta.8": "2026-10-10T11:33:26Z",
+        "v2.9.0-beta.7": "2026-10-10T11:14:31Z",
+        "v2.9.0-beta.6": "2026-10-10T11:03:18Z",
+        "v2.9.0-beta.5": "2026-10-09T21:20:09Z",
+        "v2.9.0-beta.4": "2026-10-09T20:07:37Z",
+        "v2.9.0-beta.3": "2026-10-09T08:07:48Z",
+        "v2.9.0-beta.2": "2026-10-08T19:22:46Z",
+        "v2.9.0-beta.1": "2026-10-08T17:58:45Z",
+        "v2.8.2": "2026-10-07T19:59:29Z",
+        "v2.8.2-beta.2": "2026-10-07T19:07:10Z",
+        "v2.8.2-beta.1": "2026-10-07T19:06:13Z",
+        "v2.8.1": "2026-10-05T14:40:31Z",
+        "v2.8.1-beta.3": "2026-10-05T14:21:34Z",
+        "v2.8.1-beta.2": "2026-10-05T12:47:53Z",
+        "v2.8.1-beta.1": "2026-10-04T19:02:35Z",
+        "v2.8.0": "2026-10-04T06:56:41Z",
+        "v2.8.0-beta.5": "2026-10-03T17:59:04Z",
+        "v2.8.0-beta.4": "2026-10-03T15:26:15Z",
+        "v2.8.0-beta.3": "2026-10-03T14:21:23Z",
+        "v2.8.0-beta.2": "2026-10-02T14:04:30Z",
+        "v2.8.0-beta.1": "2026-10-02T09:14:57Z",
+        "v2.7.0": "2026-09-30T18:49:19Z",
+        "v2.7.0-beta.7": "2026-09-30T13:38:41Z",
+        "v2.7.0-beta.6": "2026-09-30T13:08:02Z",
+        "v2.7.0-beta.5": "2026-09-30T12:58:02Z",
+        "v2.7.0-beta.4": "2026-09-30T12:21:04Z",
+        "v2.7.0-beta.3": "2026-09-30T10:55:05Z",
+        "v2.7.0-beta.2": "2026-09-30T10:25:39Z",
+        "v2.7.0-beta.1": "2026-09-30T08:56:54Z",
+        "v2.6.0": "2026-09-29T15:19:05Z",
+        "v2.6.0-beta.7": "2026-09-29T11:51:06Z",
+        "v2.6.0-beta.5": "2026-09-29T10:13:51Z",
+        "v2.6.0-beta.4": "2026-09-28T14:36:33Z",
+        "v2.6.0-beta.3": "2026-09-28T10:19:06Z",
+        "v2.6.0-beta.2": "2026-09-28T09:32:26Z",
+        "v2.6.0-beta.1": "2026-09-28T09:18:12Z",
+        "v2.5.2": "2026-09-28T07:31:46Z",
+        "2.5.2-beta.5": "2026-09-27T20:07:44Z",
+        "v2.5.2-beta.4": "2026-09-26T18:57:09Z",
+        "v2.5.2-beta.3": "2026-09-23T19:25:42Z",
+        "v2.5.2-beta.2": "2026-09-23T13:29:35Z",
+        "v2.5.2-beta.1": "2026-09-23T07:41:13Z",
+        "v2.5.1": "2026-09-23T07:18:33Z",
+        "2.5.1-beta.7": "2026-09-22T08:41:32Z",
+        "v2.5.1-beta.6": "2026-09-21T20:58:48Z",
+        "2.5.1-beta.5": "2026-09-21T14:49:06Z",
+        "2.5.1-beta.4": "2026-09-21T11:00:38Z",
+        "2.5.1-beta.3": "2026-09-21T07:17:27Z",
+        "v2.5.1-beta.2": "2026-09-20T05:43:38Z",
+        "v2.5.1-beta.1": "2026-09-16T14:12:36Z",
+        "v2.5.0": "2026-09-16T07:41:02Z",
+        "2.5.0-beta.4": "2026-09-16T07:33:02Z",
+        "2.5.0-beta.3": "2026-09-15T14:50:51Z",
+        "2.5.0-beta.2": "2026-09-08T18:11:50Z",
+        "v2.5.0-beta.1": "2026-09-07T20:03:02Z",
+        "v2.4.3": "2026-09-04T19:02:59Z",
+        "2.4.3-beta.1": "2026-09-04T17:33:00Z",
+        "v2.4.2": "2026-09-04T16:36:23Z",
+        "v2.4.1": "2026-09-02T08:08:33Z",
+        "v2.4.1-beta.3": "2026-08-31T11:08:21Z",
+        "v2.4.1-beta.2": "2026-08-26T17:59:17Z",
+        "v2.4.1-beta.1": "2026-08-23T17:40:06Z",
+        "v2.4.0": "2026-08-19T19:38:27Z",
+        "v2.4.0-beta.2": "2026-08-19T18:13:28Z",
+        "v2.4.0-beta.1": "2026-08-18T18:13:04Z",
+        "v2.3.0": "2026-08-14T19:47:29Z",
+        "v2.2.0": "2026-08-10T18:44:18Z",
+        "v2.2.0-beta.1": "2026-08-07T20:55:01Z",
+        "v2.1.0": "2026-08-06T19:54:15Z",
+        "V2.0.5-PreRelease": "2026-05-11T17:14:09Z",
+        "v2.0.1": "2026-04-02T13:35:16Z",
+        "v2.0.0": "2026-03-31T21:06:05Z",
+        "v1.0.5": "2026-03-23T09:55:49Z",
+        "v1.0.3": "2026-03-23T09:40:39Z",
+        "v1.0.2": "2026-03-23T09:17:56Z",
+        "v1.0.1": "2026-03-23T09:10:30Z",
+        "v1.0.0": "2026-03-23T08:37:39Z"
+      },
+      "stars": {
+        "total": 32,
+        "history": {
+          "2026-03-23": 2,
+          "2026-03-26": 3,
+          "2026-03-30": 4,
+          "2026-04-04": 5,
+          "2026-04-10": 6,
+          "2026-04-13": 7,
+          "2026-04-15": 8,
+          "2026-04-16": 9,
+          "2026-04-21": 10,
+          "2026-05-05": 11,
+          "2026-05-09": 12,
+          "2026-05-11": 13,
+          "2026-05-21": 14,
+          "2026-06-01": 15,
+          "2026-07-01": 16,
+          "2026-07-02": 17,
+          "2026-07-13": 18,
+          "2026-07-14": 19,
+          "2026-07-21": 20,
+          "2026-07-25": 21,
+          "2026-08-07": 23,
+          "2026-08-12": 24,
+          "2026-08-15": 25,
+          "2026-08-16": 26,
+          "2026-08-24": 27,
+          "2026-08-31": 28,
+          "2026-09-17": 29,
+          "2026-09-24": 30,
+          "2026-09-28": 31,
+          "2026-10-10": 32
+        }
+      },
+      "issues": [
+        {
+          "number": 144,
+          "title": "OCEAN 2 Plus: Charge Battery power decreases with household load instead of maintaining requested ch",
+          "createdAt": "2026-10-05T17:36:04Z",
+          "url": "https://github.com/MaxGrmm/EF-PowerOcean-TcpModbus/issues/144"
+        },
+        {
+          "number": 139,
+          "title": "PowerOcean 2 Plus (Single Phase) - Fix telemetry readings",
+          "createdAt": "2026-10-05T11:20:21Z",
+          "url": "https://github.com/MaxGrmm/EF-PowerOcean-TcpModbus/issues/139"
+        },
+        {
+          "number": 130,
+          "title": "Power Values 0W in 2.7.0",
+          "createdAt": "2026-10-01T12:16:42Z",
+          "url": "https://github.com/MaxGrmm/EF-PowerOcean-TcpModbus/issues/130"
+        },
+        {
+          "number": 127,
+          "title": "Since Update: \"The integration requires Modbus TCP to be enabled\"",
+          "createdAt": "2026-09-30T13:41:42Z",
+          "url": "https://github.com/MaxGrmm/EF-PowerOcean-TcpModbus/issues/127"
+        },
+        {
+          "number": 114,
+          "title": "Duplicate battery entries",
+          "createdAt": "2026-09-28T15:58:10Z",
+          "url": "https://github.com/MaxGrmm/EF-PowerOcean-TcpModbus/issues/114"
+        },
+        {
+          "number": 108,
+          "title": "How/Where to enable Modbus TCP",
+          "createdAt": "2026-09-26T13:46:24Z",
+          "url": "https://github.com/MaxGrmm/EF-PowerOcean-TcpModbus/issues/108"
+        },
+        {
+          "number": 107,
+          "title": "Automatic Mode Inconsistant Behaviour",
+          "createdAt": "2026-09-25T11:27:14Z",
+          "url": "https://github.com/MaxGrmm/EF-PowerOcean-TcpModbus/issues/107"
+        },
+        {
+          "number": 98,
+          "title": "Modbus Control Switch",
+          "createdAt": "2026-09-21T15:40:53Z",
+          "url": "https://github.com/MaxGrmm/EF-PowerOcean-TcpModbus/issues/98"
+        },
+        {
+          "number": 90,
+          "title": "Modbus Mode stops working",
+          "createdAt": "2026-09-19T06:04:55Z",
+          "url": "https://github.com/MaxGrmm/EF-PowerOcean-TcpModbus/issues/90"
+        },
+        {
+          "number": 89,
+          "title": "Function to fully disable/enable feed in to grid.",
+          "createdAt": "2026-09-18T14:31:01Z",
+          "url": "https://github.com/MaxGrmm/EF-PowerOcean-TcpModbus/issues/89"
+        },
+        {
+          "number": 88,
+          "title": "Battery Module Count dont work",
+          "createdAt": "2026-09-18T14:29:33Z",
+          "url": "https://github.com/MaxGrmm/EF-PowerOcean-TcpModbus/issues/88"
+        },
+        {
+          "number": 86,
+          "title": "PowerOcean 2: Modbus Exception Code 2 when reading register 0x9E47",
+          "createdAt": "2026-09-17T07:52:48Z",
+          "url": "https://github.com/MaxGrmm/EF-PowerOcean-TcpModbus/issues/86"
+        },
+        {
+          "number": 83,
+          "title": "HOLD control mode limits solar power at 100% SOC",
+          "createdAt": "2026-09-16T14:01:59Z",
+          "url": "https://github.com/MaxGrmm/EF-PowerOcean-TcpModbus/issues/83"
+        },
+        {
+          "number": 81,
+          "title": "Round house_consumption_total to 2 decimal places",
+          "createdAt": "2026-09-16T10:10:54Z",
+          "url": "https://github.com/MaxGrmm/EF-PowerOcean-TcpModbus/issues/81"
+        },
+        {
+          "number": 73,
+          "title": "The Integration stopped working for me whithout update",
+          "createdAt": "2026-09-12T09:30:32Z",
+          "url": "https://github.com/MaxGrmm/EF-PowerOcean-TcpModbus/issues/73"
+        },
+        {
+          "number": 72,
+          "title": "PV String 3 values (DC, current) showing 0 and total sum is incorrect",
+          "createdAt": "2026-09-12T08:33:07Z",
+          "url": "https://github.com/MaxGrmm/EF-PowerOcean-TcpModbus/issues/72"
+        },
+        {
+          "number": 66,
+          "title": "False “Modbus TCP must be enabled” warning when inverter temperature reports 0°C",
+          "createdAt": "2026-09-04T12:32:01Z",
+          "url": "https://github.com/MaxGrmm/EF-PowerOcean-TcpModbus/issues/66"
+        },
+        {
+          "number": 65,
+          "title": "PowerOcean integration becomes unavailable when reported battery_count differs from configured value",
+          "createdAt": "2026-09-04T12:07:10Z",
+          "url": "https://github.com/MaxGrmm/EF-PowerOcean-TcpModbus/issues/65"
+        },
+        {
+          "number": 64,
+          "title": "Integration does not load after update to 2.4.1",
+          "createdAt": "2026-09-04T06:05:32Z",
+          "url": "https://github.com/MaxGrmm/EF-PowerOcean-TcpModbus/issues/64"
+        },
+        {
+          "number": 60,
+          "title": "How to enable ModBus?",
+          "createdAt": "2026-09-01T08:22:52Z",
+          "url": "https://github.com/MaxGrmm/EF-PowerOcean-TcpModbus/issues/60"
+        },
+        {
+          "number": 57,
+          "title": "Incorrect energy values in v2.4.1-beta.2",
+          "createdAt": "2026-08-28T07:05:40Z",
+          "url": "https://github.com/MaxGrmm/EF-PowerOcean-TcpModbus/issues/57"
+        },
+        {
+          "number": 53,
+          "title": "Values stucking again ?",
+          "createdAt": "2026-08-19T16:43:11Z",
+          "url": "https://github.com/MaxGrmm/EF-PowerOcean-TcpModbus/issues/53"
+        },
+        {
+          "number": 49,
+          "title": "New Release?",
+          "createdAt": "2026-08-14T08:13:09Z",
+          "url": "https://github.com/MaxGrmm/EF-PowerOcean-TcpModbus/issues/49"
+        },
+        {
+          "number": 46,
+          "title": "PowerOcean Three Phase: most Modbus values are 0 + external inverter/PV meter value missing",
+          "createdAt": "2026-08-13T16:52:26Z",
+          "url": "https://github.com/MaxGrmm/EF-PowerOcean-TcpModbus/issues/46"
+        },
+        {
+          "number": 44,
+          "title": "Maximum feed-in Power always 0",
+          "createdAt": "2026-08-11T07:26:51Z",
+          "url": "https://github.com/MaxGrmm/EF-PowerOcean-TcpModbus/issues/44"
+        },
+        {
+          "number": 43,
+          "title": "Battery Heating Indicator",
+          "createdAt": "2026-08-10T08:06:44Z",
+          "url": "https://github.com/MaxGrmm/EF-PowerOcean-TcpModbus/issues/43"
+        },
+        {
+          "number": 42,
+          "title": "Integration stopped reporting Data at night",
+          "createdAt": "2026-08-08T06:45:33Z",
+          "url": "https://github.com/MaxGrmm/EF-PowerOcean-TcpModbus/issues/42"
+        },
+        {
+          "number": 37,
+          "title": "Register 40552, Nominale Batteriekapazität, Bestätigung auch für 5kWh oder 15kWh",
+          "createdAt": "2026-08-07T00:11:58Z",
+          "url": "https://github.com/MaxGrmm/EF-PowerOcean-TcpModbus/issues/37"
+        },
+        {
+          "number": 36,
+          "title": "Register 40530, Bit(0) entspricht Statusbit Inselbetrieb / Netzbetrieb",
+          "createdAt": "2026-08-06T23:50:53Z",
+          "url": "https://github.com/MaxGrmm/EF-PowerOcean-TcpModbus/issues/36"
+        },
+        {
+          "number": 35,
+          "title": "Incomplete modbus values for Power Ocean Plus V3.0.19.19",
+          "createdAt": "2026-08-06T10:09:22Z",
+          "url": "https://github.com/MaxGrmm/EF-PowerOcean-TcpModbus/issues/35"
+        },
+        {
+          "number": 34,
+          "title": "Modbus values stuck",
+          "createdAt": "2026-08-04T15:35:11Z",
+          "url": "https://github.com/MaxGrmm/EF-PowerOcean-TcpModbus/issues/34"
+        },
+        {
+          "number": 33,
+          "title": "pv_strings change via Options not applied (reverts to 2, 3rd string stays 0) — only works on fresh s",
+          "createdAt": "2026-07-19T15:39:36Z",
+          "url": "https://github.com/MaxGrmm/EF-PowerOcean-TcpModbus/issues/33"
+        },
+        {
+          "number": 32,
+          "title": "Battery SOC becomes 0 without updates",
+          "createdAt": "2026-07-09T18:04:47Z",
+          "url": "https://github.com/MaxGrmm/EF-PowerOcean-TcpModbus/issues/32"
+        },
+        {
+          "number": 31,
+          "title": "Different values between website and integration",
+          "createdAt": "2026-07-09T15:57:29Z",
+          "url": "https://github.com/MaxGrmm/EF-PowerOcean-TcpModbus/issues/31"
+        },
+        {
+          "number": 29,
+          "title": "New Registers",
+          "createdAt": "2026-06-16T08:49:11Z",
+          "url": "https://github.com/MaxGrmm/EF-PowerOcean-TcpModbus/issues/29"
+        },
+        {
+          "number": 28,
+          "title": "Values Mismatch",
+          "createdAt": "2026-06-13T20:10:36Z",
+          "url": "https://github.com/MaxGrmm/EF-PowerOcean-TcpModbus/issues/28"
+        },
+        {
+          "number": 27,
+          "title": "Grid Power not showing any values",
+          "createdAt": "2026-05-29T06:23:50Z",
+          "url": "https://github.com/MaxGrmm/EF-PowerOcean-TcpModbus/issues/27"
+        },
+        {
+          "number": 26,
+          "title": "Functionality: PowerGlow and PowerPulse",
+          "createdAt": "2026-05-27T09:43:13Z",
+          "url": "https://github.com/MaxGrmm/EF-PowerOcean-TcpModbus/issues/26"
+        },
+        {
+          "number": 25,
+          "title": "Leistungszahl wird bei kühlen nicht berechnet.",
+          "createdAt": "2026-05-23T11:28:59Z",
+          "url": "https://github.com/MaxGrmm/EF-PowerOcean-TcpModbus/issues/25"
+        },
+        {
+          "number": 24,
+          "title": "Registerinhalt (40530) entspricht nicht \"Inverter AC Power\"",
+          "createdAt": "2026-05-22T12:25:44Z",
+          "url": "https://github.com/MaxGrmm/EF-PowerOcean-TcpModbus/issues/24"
+        },
+        {
+          "number": 23,
+          "title": "Input Register Adressbereich 42081 bis 42084",
+          "createdAt": "2026-05-22T11:00:07Z",
+          "url": "https://github.com/MaxGrmm/EF-PowerOcean-TcpModbus/issues/23"
+        },
+        {
+          "number": 21,
+          "title": "Werte bleiben stehen",
+          "createdAt": "2026-05-21T12:59:46Z",
+          "url": "https://github.com/MaxGrmm/EF-PowerOcean-TcpModbus/issues/21"
+        },
+        {
+          "number": 16,
+          "title": "Unknown registers investigation",
+          "createdAt": "2026-05-10T18:08:06Z",
+          "url": "https://github.com/MaxGrmm/EF-PowerOcean-TcpModbus/issues/16"
+        },
+        {
+          "number": 14,
+          "title": "Shown \"Solar Power\" lower than actual solar power (via Ecoflow App and addition)",
+          "createdAt": "2026-05-09T11:12:21Z",
+          "url": "https://github.com/MaxGrmm/EF-PowerOcean-TcpModbus/issues/14"
+        },
+        {
+          "number": 12,
+          "title": "Individual PV string voltage not measured (only string 2 voltage shown)",
+          "createdAt": "2026-04-21T11:24:19Z",
+          "url": "https://github.com/MaxGrmm/EF-PowerOcean-TcpModbus/issues/12"
+        },
+        {
+          "number": 10,
+          "title": "Artefakte durch kurzzeitig fehlende Werte",
+          "createdAt": "2026-04-10T23:28:32Z",
+          "url": "https://github.com/MaxGrmm/EF-PowerOcean-TcpModbus/issues/10"
+        },
+        {
+          "number": 9,
+          "title": "Einrichtung - Verständnisproblem",
+          "createdAt": "2026-04-10T15:43:03Z",
+          "url": "https://github.com/MaxGrmm/EF-PowerOcean-TcpModbus/issues/9"
+        },
+        {
+          "number": 8,
+          "title": "PV String 3",
+          "createdAt": "2026-04-10T07:19:41Z",
+          "url": "https://github.com/MaxGrmm/EF-PowerOcean-TcpModbus/issues/8"
+        },
+        {
+          "number": 7,
+          "title": "not connecting to Power Ocean",
+          "createdAt": "2026-04-05T12:10:38Z",
+          "url": "https://github.com/MaxGrmm/EF-PowerOcean-TcpModbus/issues/7"
+        },
+        {
+          "number": 6,
+          "title": "PowerOcean: Die meisten Werte zeigen 0",
+          "createdAt": "2026-04-02T19:24:32Z",
+          "url": "https://github.com/MaxGrmm/EF-PowerOcean-TcpModbus/issues/6"
+        },
+        {
+          "number": 3,
+          "title": "PowerOcean System (ohne Plus) werte Flappen hin und her",
+          "createdAt": "2026-04-01T16:04:57Z",
+          "url": "https://github.com/MaxGrmm/EF-PowerOcean-TcpModbus/issues/3"
+        },
+        {
+          "number": 2,
+          "title": "Werte im Homeassistant frieren ein.",
+          "createdAt": "2026-03-29T22:31:01Z",
+          "url": "https://github.com/MaxGrmm/EF-PowerOcean-TcpModbus/issues/2"
+        },
+        {
+          "number": 1,
+          "title": "Ausschalten des POs führt zu eingefrorenen Werten",
+          "createdAt": "2026-03-27T08:53:05Z",
+          "url": "https://github.com/MaxGrmm/EF-PowerOcean-TcpModbus/issues/1"
+        }
+      ]
+    }
+  }
+}

@@ -6,7 +6,10 @@ import {
   ArrowUp,
   ArrowUpDown,
   BarChart3,
+  Bug,
   CalendarDays,
+  ChevronRight,
+  Clock3,
   Check,
   ChevronDown,
   Download,
@@ -14,6 +17,7 @@ import {
   FileDown,
   FlaskConical,
   GitBranch,
+  Heart,
   Info,
   Layers3,
   Link2,
@@ -22,9 +26,12 @@ import {
   SlidersHorizontal,
   Sparkles,
   Star,
+  Target,
   TrendingUp,
+  Users,
+  Wrench,
 } from 'lucide-react';
-import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react';
 import projectConfigs from './projects.json';
 import { formatGitHubStarCount, parseGitHubStarCount } from './github';
@@ -44,6 +51,34 @@ import {
   toCsv,
 } from './analytics';
 import type { ReleaseWindow, SortDirection, SortKey } from './analytics';
+import {
+  DAY_MS as INSIGHT_DAY_MS,
+  activeUserEstimate,
+  assetShareTrend,
+  betaPool,
+  countResets,
+  dailySeries,
+  daysToMajority,
+  deltaSince,
+  detectSpikes,
+  findHotfix,
+  forecastFirstWeek,
+  issuesAfterRelease,
+  launchCurve,
+  median,
+  milestoneHours,
+  nextMilestone,
+  olderVersionShare,
+  projectTimeline,
+  recentDownloadsByVersion,
+  releaseCadence,
+  releasePoints,
+  versionMix,
+} from './insights';
+import type { ActiveUserItem, ReleaseCurveInput } from './insights';
+import { latestInstalls, parseProjectMeta } from './meta';
+import type { ProjectMetaFile } from './meta';
+import { InsightTile, LaunchHeatmap, LineChart, PortfolioTable, ReleaseDetail, formatDays } from './Lifecycle';
 
 type AssetMatcher =
   | { assetName: string; assetNameTemplate?: never }
@@ -77,6 +112,7 @@ type ReleaseMetric = {
     downloads: number;
     size: number;
   }>;
+  reactions?: { total: number; positive: number; negative: number };
 };
 
 type GitHubRelease = {
@@ -85,6 +121,7 @@ type GitHubRelease = {
   html_url: string;
   draft: boolean;
   prerelease: boolean;
+  reactions?: Partial<Record<'total_count' | '+1' | '-1' | 'laugh' | 'hooray' | 'confused' | 'heart' | 'rocket' | 'eyes', number>>;
   assets: Array<{
     name: string;
     download_count: number;
@@ -217,7 +254,7 @@ function getInitialProjectId() {
 }
 
 function snapshotCacheKey(projectId: string) {
-  return `hacs-downloads-snapshot-${projectId}-v3`;
+  return `hacs-downloads-snapshot-${projectId}-v4`;
 }
 
 function readRateLimitReset(): number | null {
@@ -615,7 +652,10 @@ export default function Home() {
   const [chartMetric, setChartMetric] = useState<'total' | 'rate'>('total');
   const [sort, setSort] = useState<{ key: SortKey; direction: SortDirection }>({ key: 'published', direction: 'desc' });
   const [linkState, setLinkState] = useState<'idle' | 'copied' | 'error'>('idle');
-  const [growthRange, setGrowthRange] = useState<'daily' | 'weekly'>('daily');
+  const [velocityView, setVelocityView] = useState<'daily' | 'weekly' | 'versions'>('daily');
+  const growthRange: 'daily' | 'weekly' = velocityView === 'weekly' ? 'weekly' : 'daily';
+  const [meta, setMeta] = useState<ProjectMetaFile | null>(null);
+  const [expandedVersion, setExpandedVersion] = useState<string | null>(null);
   const [history, setHistory] = useState<DownloadHistory | null>(null);
   const [historyStatus, setHistoryStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const requestSequence = useRef(0);
@@ -709,6 +749,13 @@ export default function Home() {
           url: release.html_url,
           prerelease: release.prerelease,
           ...(project.assets ? { assets } : {}),
+          ...(release.reactions?.total_count ? {
+            reactions: {
+              total: release.reactions.total_count,
+              positive: (release.reactions['+1'] ?? 0) + (release.reactions.laugh ?? 0) + (release.reactions.hooray ?? 0) + (release.reactions.heart ?? 0) + (release.reactions.rocket ?? 0),
+              negative: (release.reactions['-1'] ?? 0) + (release.reactions.confused ?? 0),
+            },
+          } : {}),
         }];
       }).sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt));
       if (requestId !== requestSequence.current) return;
@@ -755,6 +802,17 @@ export default function Home() {
       }
     };
     void loadHistory();
+    return () => controller.abort();
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch('project-meta.json', { cache: 'no-cache', signal: controller.signal })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((payload: unknown) => setMeta(parseProjectMeta(payload)))
+      .catch(() => {
+        // Project metadata is optional; the dashboard works without it.
+      });
     return () => controller.abort();
   }, []);
 
@@ -1023,6 +1081,117 @@ export default function Home() {
   const recordEta = releaseComparison?.state === 'behind'
     ? daysToRecord(Math.abs(releaseComparison.difference), latestDailyPace)
     : null;
+  const timeline = useMemo(() => projectTimeline(history, project.id), [history, project.id]);
+  const projectMeta = meta?.projects[project.id];
+  const stableReleases = useMemo(() => allReleases.filter((release) => !release.prerelease), [allReleases]);
+  const prereleaseList = useMemo(() => allReleases.filter((release) => release.prerelease), [allReleases]);
+  const mix = useMemo(() => versionMix(timeline, 14), [timeline]);
+  const releaseInsights = useMemo(() => {
+    const liveTime = snapshot ? Date.parse(snapshot.updatedAt) : Number.NaN;
+    const inputs = new Map<string, ReleaseCurveInput>(allReleases.map((release) => {
+      const points = releasePoints(timeline, release.version);
+      const last = points.at(-1);
+      // The live counter extends the daily history up to the latest refresh.
+      if (Number.isFinite(liveTime) && (!last || liveTime > last.t)) points.push({ t: liveTime, v: Math.max(release.downloads, last?.v ?? 0) });
+      return [release.version, { version: release.version, publishedAt: Date.parse(release.publishedAt), points }];
+    }));
+    const stableInputs = stableReleases.flatMap((release) => inputs.get(release.version) ?? []);
+    const prereleaseInputs = prereleaseList.flatMap((release) => inputs.get(release.version) ?? []);
+    return new Map(allReleases.map((release) => {
+      const input = inputs.get(release.version) as ReleaseCurveInput;
+      return [release.version, {
+        input,
+        curve: launchCurve(input.points, input.publishedAt),
+        firstWeek: forecastFirstWeek(input, release.prerelease ? prereleaseInputs : stableInputs),
+        majorityDays: daysToMajority(mix, release.version, input.publishedAt),
+        milestones: milestoneHours(input.points, input.publishedAt, [10, 25, 50, 100, 250, 500, 1000, 2500, 5000]),
+        issues: issuesAfterRelease(projectMeta?.issues ?? [], release.publishedAt),
+        hotfix: release.prerelease ? null : findHotfix(stableReleases, release.version),
+        resets: countResets(timeline, release.version),
+      }];
+    }));
+  }, [allReleases, mix, prereleaseList, projectMeta, snapshot, stableReleases, timeline]);
+
+  const launchRows = scopedReleases.flatMap((release) => {
+    const insight = releaseInsights.get(release.version);
+    return insight ? [{
+      version: release.version,
+      url: release.url,
+      prerelease: release.prerelease,
+      isLatest: release.version === summary?.latest.version,
+      curve: insight.curve,
+      firstWeek: insight.firstWeek,
+      majorityDays: insight.majorityDays,
+    }] : [];
+  });
+
+  const activeUsers = activeUserEstimate(stableReleases.slice(0, 3).map((release): ActiveUserItem => {
+    const curve = releaseInsights.get(release.version)?.curve;
+    if (curve?.firstWeek != null) return { version: release.version, value: curve.firstWeek, kind: 'first-week' };
+    return { version: release.version, value: release.downloads, kind: releaseAgeDays(release.publishedAt) < 7 ? 'so-far' : 'lifetime' };
+  }));
+  const latestStable = stableReleases[0];
+  const latestMajority = latestStable ? releaseInsights.get(latestStable.version)?.majorityDays ?? null : null;
+  const typicalMajority = median(stableReleases.flatMap((release) => {
+    const days = releaseInsights.get(release.version)?.majorityDays;
+    return days === null || days === undefined ? [] : [days];
+  }));
+  const olderShare = olderVersionShare(recentDownloadsByVersion(timeline, 7), stableReleases.map((release) => release.version));
+  const cadence = releaseCadence(stableReleases);
+  const lastHotfix = stableReleases.map((release) => ({ release, hotfix: releaseInsights.get(release.version)?.hotfix })).find((entry) => entry.hotfix);
+  const betas = betaPool(prereleaseList);
+  const totalPace = metricGrowth?.total.week ? metricGrowth.total.week.absolute / 7 : metricGrowth?.total.day?.absolute ?? null;
+  const milestone = summary ? nextMilestone(summary.total, totalPace) : null;
+  const assetTrend = hasAssetBreakdown ? assetShareTrend(timeline, trackedAssets[0].id) : null;
+  const starSeries = useMemo(() => dailySeries(projectMeta?.stars?.history), [projectMeta]);
+  const starsWeek = deltaSince(starSeries, 7);
+  const starsMonth = deltaSince(starSeries, 30);
+  const installs = latestInstalls(projectMeta);
+  const recentIssues = (projectMeta?.issues ?? []).filter((issue) => Date.now() - Date.parse(issue.createdAt) <= 30 * INSIGHT_DAY_MS);
+  const issuesPerRelease = median(stableReleases.slice(0, 5)
+    .filter((release) => releaseAgeDays(release.publishedAt) >= 3)
+    .map((release) => releaseInsights.get(release.version)?.issues.length ?? 0));
+  const portfolioRows = PROJECTS.length > 1 ? PROJECTS.map((candidate) => {
+    const candidateTimeline = projectTimeline(history, candidate.id);
+    const latest = candidateTimeline.at(-1)?.project;
+    const growth = calculateMetricGrowth(history, candidate.id, (projectSnapshot) => projectSnapshot.total);
+    const firstRelease = Object.values(meta?.projects[candidate.id]?.releases ?? {}).map(Date.parse).filter(Number.isFinite).sort((a, b) => a - b)[0];
+    const total = candidate.id === project.id && summary ? allReleases.reduce((sum, release) => sum + release.downloads, 0) : latest?.total ?? 0;
+    return {
+      id: candidate.id,
+      name: candidate.name,
+      total,
+      week: growth.week?.absolute ?? null,
+      perDay: firstRelease ? total / Math.max(1, (Date.now() - firstRelease) / INSIGHT_DAY_MS) : null,
+      stars: meta?.projects[candidate.id]?.stars?.total ?? null,
+      selected: candidate.id === project.id,
+    };
+  }).sort((a, b) => b.total - a.total) : [];
+
+  const includedMix = mix.map((day) => {
+    const byVersion = Object.fromEntries(Object.entries(day.byVersion).filter(([version]) => isIncludedVersion(version)));
+    return { ...day, byVersion, total: Object.values(byVersion).reduce((sum, value) => sum + value, 0) };
+  });
+  const mixTotals = includedMix.reduce<Record<string, number>>((totals, day) => {
+    Object.entries(day.byVersion).forEach(([version, value]) => { totals[version] = (totals[version] ?? 0) + value; });
+    return totals;
+  }, {});
+  const mixLeaders = Object.entries(mixTotals)
+    .filter(([version]) => !prereleaseVersions.has(version))
+    .sort((a, b) => b[1] - a[1]).slice(0, 3).map(([version]) => version);
+  const mixCategories = [
+    ...mixLeaders.map((version, index) => ({ id: version, label: version, color: SHARE_COLORS[index], striped: false })),
+    { id: 'older', label: 'Older stable', color: SHARE_OTHER_COLOR, striped: false },
+    ...(includePrereleases ? [{ id: 'pre', label: 'Pre-releases', color: '#7adccd', striped: true }] : []),
+  ];
+  const mixCategory = (version: string) => (prereleaseVersions.has(version) ? 'pre' : mixLeaders.includes(version) ? version : 'older');
+  const maxMix = Math.max(1, ...includedMix.map((day) => day.total));
+  const growthSpikes = detectSpikes(growthSeries.map((point) => point.value));
+  const releasesBetween = (start: number, end: number) => releases.filter((release) => {
+    const published = Date.parse(release.publishedAt);
+    return published > start && published <= end;
+  }).map((release) => release.version);
+
   const latestMomentum = summary && metricGrowth?.latest.week && metricGrowth.total.week && metricGrowth.total.week.absolute > 0
     ? Math.round((metricGrowth.latest.week.absolute / metricGrowth.total.week.absolute) * 100)
     : null;
@@ -1183,7 +1352,7 @@ export default function Home() {
               All <em>{releases.length}</em>
             </button>
           </div>
-          <small className="scope-hint">Applies to chart, share and table</small>
+          <small className="scope-hint">Applies to chart, share, launch curves and table</small>
         </div>
         <div className="scope-summary">
           <span aria-live="polite">{scopeLabel}</span>
@@ -1214,11 +1383,16 @@ export default function Home() {
             <p className="eyebrow">Growth</p>
             <h2 id="growth-title">Download velocity</h2>
             <ScopeChip label={includePrereleases ? 'Including pre-releases' : 'Stable releases'} />
-            {hasAssetBreakdown && secondaryAsset && <AssetLegend assets={[primaryAsset, secondaryAsset]} />}
+            {velocityView === 'versions'
+              ? <div className="asset-legend" aria-label="Version key">{mixCategories.map((category) => (
+                  <span key={category.id}><i className={category.striped ? 'is-striped' : ''} style={category.striped ? undefined : { background: category.color }} />{category.label}</span>
+                ))}</div>
+              : hasAssetBreakdown && secondaryAsset && <AssetLegend assets={[primaryAsset, secondaryAsset]} />}
           </div>
-          <div className="segmented-control" aria-label="Growth interval">
-            <button className={growthRange === 'daily' ? 'active' : ''} onClick={() => setGrowthRange('daily')} type="button">Daily</button>
-            <button className={growthRange === 'weekly' ? 'active' : ''} onClick={() => setGrowthRange('weekly')} type="button">Weekly</button>
+          <div className="segmented-control" role="radiogroup" aria-label="Growth view">
+            <button aria-checked={velocityView === 'daily'} className={velocityView === 'daily' ? 'active' : ''} onClick={() => setVelocityView('daily')} role="radio" type="button">Daily</button>
+            <button aria-checked={velocityView === 'weekly'} className={velocityView === 'weekly' ? 'active' : ''} onClick={() => setVelocityView('weekly')} role="radio" type="button">Weekly</button>
+            <button aria-checked={velocityView === 'versions'} className={velocityView === 'versions' ? 'active' : ''} onClick={() => setVelocityView('versions')} role="radio" type="button" title="Which versions people downloaded each day">By version</button>
           </div>
         </div>
         <div className="growth-layout">
@@ -1227,7 +1401,34 @@ export default function Home() {
             role="img"
             aria-label={`${growthRange === 'daily' ? 'Daily' : 'Weekly'} new ${hasAssetBreakdown ? 'tracked downloads' : 'downloads'} for ${project.name}`}
           >
-            {growthSeries.length === 0
+            {velocityView === 'versions'
+              ? includedMix.length === 0
+                ? <div className="growth-placeholder">
+                    <CalendarDays size={18} aria-hidden="true" />
+                    <strong>{historyStatus === 'loading' ? 'Loading growth history…' : 'Collecting daily history'}</strong>
+                    <span>The version split appears after two daily snapshots.</span>
+                  </div>
+                : includedMix.map((day, index) => {
+                  const segments = mixCategories.map((category) => ({
+                    ...category,
+                    value: Object.entries(day.byVersion).reduce((sum, [version, value]) => sum + (mixCategory(version) === category.id ? value : 0), 0),
+                  }));
+                  const released = releasesBetween(index > 0 ? includedMix[index - 1].t : day.t - INSIGHT_DAY_MS, day.t);
+                  return (
+                    <div className="velocity-column" key={day.t} title={`${day.label}: ${segments.filter((segment) => segment.value).map((segment) => `${segment.label} ${segment.value}`).join(', ') || 'no downloads'}${released.length ? `. Released ${released.join(', ')}` : ''}`}>
+                      <span className="velocity-value">{released.length > 0 && <i className="release-dot" aria-label={`Released ${released.join(', ')}`} />}{day.total ? `+${formatNumber(day.total)}` : '0'}</span>
+                      <span className="velocity-track">
+                        <span className="velocity-stack" style={{ height: `${Math.max((day.total / maxMix) * 100, day.total ? 5 : 0)}%` }}>
+                          {[...segments].reverse().filter((segment) => segment.value > 0).map((segment) => (
+                            <i className={`bar-segment${segment.striped ? ' is-striped' : ''}`} key={segment.id} style={{ flexGrow: segment.value, ...(segment.striped ? {} : { background: segment.color }) }} />
+                          ))}
+                        </span>
+                      </span>
+                      <span className="velocity-label">{index % 2 === 0 || index === includedMix.length - 1 ? day.label : ''}</span>
+                    </div>
+                  );
+                })
+              : growthSeries.length === 0
               ? <div className="growth-placeholder">
                   <CalendarDays size={18} aria-hidden="true" />
                   <strong>{historyStatus === 'loading' ? 'Loading growth history…' : historyStatus === 'error' ? 'Growth history is unavailable' : `Collecting ${growthRange} history`}</strong>
@@ -1237,9 +1438,17 @@ export default function Home() {
                 const primaryDownloads = point.assets?.[primaryAsset.id] ?? 0;
                 const secondaryDownloads = secondaryAsset ? point.assets?.[secondaryAsset.id] ?? 0 : 0;
                 const showAssetStack = hasAssetBreakdown && secondaryAsset && primaryDownloads >= 0 && secondaryDownloads >= 0;
+                const pointTime = Date.parse(point.capturedAt);
+                const released = releasesBetween(index > 0 ? Date.parse(growthSeries[index - 1].capturedAt) : pointTime - (growthRange === 'daily' ? 1 : 7) * INSIGHT_DAY_MS, pointTime);
+                const isSpike = growthSpikes[index];
                 return (
-                <div className={`velocity-column${growthPeak?.capturedAt === point.capturedAt ? ' is-peak' : ''}`} key={point.capturedAt} aria-label={`${point.label}: ${point.value} new ${hasAssetBreakdown ? `tracked downloads, ${primaryDownloads} ${primaryAsset.label}, ${secondaryDownloads} ${secondaryAsset?.label}` : 'downloads'}`}>
-                  <span className="velocity-value">{formatSignedNumber(point.value)}</span>
+                <div
+                  className={`velocity-column${growthPeak?.capturedAt === point.capturedAt ? ' is-peak' : ''}${isSpike ? ' is-spike' : ''}`}
+                  key={point.capturedAt}
+                  title={`${point.label}: ${formatSignedNumber(point.value)} downloads${isSpike ? ' (unusually high)' : ''}${released.length ? `. Released ${released.join(', ')}` : ''}`}
+                  aria-label={`${point.label}: ${point.value} new ${hasAssetBreakdown ? `tracked downloads, ${primaryDownloads} ${primaryAsset.label}, ${secondaryDownloads} ${secondaryAsset?.label}` : 'downloads'}${isSpike ? ', unusually high' : ''}${released.length ? `, released ${released.join(', ')}` : ''}`}
+                >
+                  <span className="velocity-value">{released.length > 0 && <i className="release-dot" aria-hidden="true" />}{formatSignedNumber(point.value)}{isSpike && <b className="spike-flag">Spike</b>}</span>
                   <span className="velocity-track">
                     {showAssetStack
                       ? <span className="velocity-stack" style={{ height: `${Math.max((Math.abs(point.value) / maxGrowth) * 100, point.value ? 5 : 0)}%` }}>
@@ -1272,7 +1481,7 @@ export default function Home() {
                 <div><dt>Peak</dt><dd>{growthPeak ? <>{formatSignedNumber(growthPeak.value)}<small>{growthPeak.label}</small></> : '—'}</dd></div>
               </dl>
             )}
-            <p>History is captured daily at approximately 04:17 UTC.</p>
+            <p><i className="release-dot" aria-hidden="true" /> marks a day with a release. Hover a bar for details. History is captured daily at approximately 04:17 UTC.</p>
           </aside>
         </div>
       </section>
@@ -1411,6 +1620,118 @@ export default function Home() {
         </aside>
       </section>
 
+      <section className={`panel lifecycle-panel scope-area${scopeClass('channel', 'window')}`} aria-labelledby="lifecycle-title">
+        <div className="card-heading">
+          <div>
+            <p className="eyebrow">Release lifecycle</p>
+            <h2 id="lifecycle-title">Launch curves</h2>
+            <ScopeChip label={scopeLabel} />
+          </div>
+          <Clock3 size={18} aria-hidden="true" />
+        </div>
+        <p className="panel-intro">Downloads in each release&rsquo;s first days, reconstructed from daily snapshots. Darker cells mean more downloads; italic numbers are still counting.</p>
+        <LaunchHeatmap rows={launchRows} />
+      </section>
+
+      <section className="insight-grid" aria-label="Lifecycle insights">
+        <InsightTile icon={<Users size={16} />} label="Active installs (estimate)" value={activeUsers ? `≈${formatNumber(activeUsers.value)}${activeUsers.lowerBound ? '+' : ''}` : '—'}>
+          {activeUsers
+            ? <>Typical first-week downloads of the last {activeUsers.items.length} stable {activeUsers.items.length === 1 ? 'release' : 'releases'}. Most HACS users update within a week{activeUsers.lowerBound ? '; a release under 7 days old makes this a lower bound' : ''}.</>
+            : 'Appears once a stable release has downloads.'}
+        </InsightTile>
+        <InsightTile icon={<Activity size={16} />} label="Upgrade speed" value={latestMajority !== null ? formatDays(latestMajority) : typicalMajority !== null ? formatDays(typicalMajority) : '—'}>
+          {latestMajority !== null
+            ? <>{latestStable?.version} took over half of daily downloads after {formatDays(latestMajority)}{typicalMajority !== null ? ` (typical: ${formatDays(typicalMajority)})` : ''}.</>
+            : typicalMajority !== null
+              ? <>Typical time for a release to take over half of daily downloads. {latestStable?.version} hasn&rsquo;t yet.</>
+              : 'Needs daily snapshots around a release.'}
+        </InsightTile>
+        <InsightTile icon={<Layers3 size={16} />} label="On older versions" value={olderShare ? `${Math.round(olderShare.share)}%` : '—'}>
+          {olderShare
+            ? <>{formatNumber(olderShare.downloads)} of the last 7 days&rsquo; {formatNumber(olderShare.total)} downloads were for versions two or more releases behind, likely pinned installs.</>
+            : 'Needs a week of snapshots.'}
+        </InsightTile>
+        <InsightTile icon={<CalendarDays size={16} />} label="Release cadence" value={cadence.medianGapDays !== null ? `Every ${formatDays(cadence.medianGapDays)}` : '—'}>
+          {cadence.releasesLast30Days} stable {cadence.releasesLast30Days === 1 ? 'release' : 'releases'} in 30 days{cadence.daysSinceLast !== null ? `, last one ${formatDays(cadence.daysSinceLast)} ago` : ''}.{lastHotfix?.hotfix ? ` Latest hotfix: ${lastHotfix.release.version} → ${lastHotfix.hotfix.version}.` : ''}
+        </InsightTile>
+        <InsightTile icon={<FlaskConical size={16} />} label="Beta testers" value={betas ? `≈${formatNumber(betas.typical)}` : '—'}>
+          {betas ? <>Typical downloads per pre-release across the last {betas.count} (max {formatNumber(betas.max)}).</> : 'No pre-releases published.'}
+        </InsightTile>
+        <InsightTile icon={<Target size={16} />} label="Next milestone" value={milestone ? formatNumber(milestone.target) : '—'}>
+          {milestone
+            ? milestone.days !== null
+              ? <>{formatNumber(milestone.remaining)} to go; ≈{new Intl.DateTimeFormat('en', { day: 'numeric', month: 'short' }).format(new Date(Date.now() + milestone.days * INSIGHT_DAY_MS))} at {formatRate(totalPace ?? 0)}/day.</>
+              : <>{formatNumber(milestone.remaining)} to go; a forecast needs recent growth history.</>
+            : emptyNote}
+        </InsightTile>
+        {assetTrend && secondaryAsset && (
+          <InsightTile icon={<Package size={16} />} label={`${primaryAsset.label} share`} value={assetTrend.current !== null ? `${Math.round(assetTrend.current)}%` : '—'}>
+            Of new downloads in the last 7 days{assetTrend.previous !== null ? ` (${Math.round(assetTrend.previous)}% the week before)` : ''}. For firmware, factory images usually mean new devices and OTA means updates.
+          </InsightTile>
+        )}
+      </section>
+
+      <section className="analytics-grid community-grid">
+        <article className="panel community-card" aria-labelledby="community-title">
+          <div className="card-heading">
+            <div>
+              <p className="eyebrow">Community</p>
+              <h2 id="community-title">Stars over time</h2>
+            </div>
+            <Star size={18} aria-hidden="true" />
+          </div>
+          {starSeries.length >= 2
+            ? <>
+                <LineChart label={`Cumulative GitHub stars for ${project.name}`} height={130} series={[{ id: 'stars', points: starSeries, color: '#0b8e81' }]} />
+                <div className="detail-axis"><span>{formatShortDate(new Date(starSeries[0].t).toISOString())}</span><span>Today</span></div>
+              </>
+            : <div className="insight-placeholder">Star history appears after the next daily capture.</div>}
+          <dl className="community-stats">
+            <div><dt>Stars</dt><dd>{stars === undefined ? '—' : formatNumber(stars)}</dd></div>
+            <div><dt>Last 7 days</dt><dd>{starsWeek === null ? '—' : formatSignedNumber(starsWeek)}</dd></div>
+            <div><dt>Last 30 days</dt><dd>{starsMonth === null ? '—' : formatSignedNumber(starsMonth)}</dd></div>
+            <div><dt>Downloads per star</dt><dd>{stars && summary ? (summary.total / stars).toFixed(1) : '—'}</dd></div>
+          </dl>
+        </article>
+        <aside className="panel community-card" aria-labelledby="quality-title">
+          <div className="card-heading">
+            <div>
+              <p className="eyebrow">Quality and reach</p>
+              <h2 id="quality-title">After each release</h2>
+            </div>
+            <Bug size={18} aria-hidden="true" />
+          </div>
+          <dl className="community-stats is-stacked">
+            <div><dt>Issues opened in the last 30 days</dt><dd>{projectMeta?.issues ? formatNumber(recentIssues.length) : '—'}</dd></div>
+            <div><dt>Typical issues within 72 h of a release</dt><dd>{issuesPerRelease === null ? '—' : issuesPerRelease.toFixed(issuesPerRelease % 1 ? 1 : 0)}</dd></div>
+            <div><dt>Hotfixed releases (next release within 48 h)</dt><dd>{stableReleases.filter((release) => releaseInsights.get(release.version)?.hotfix).length} of {stableReleases.length}</dd></div>
+            <div><dt>Reactions on release notes</dt><dd>{formatNumber(allReleases.reduce((sum, release) => sum + (release.reactions?.total ?? 0), 0))}</dd></div>
+            <div>
+              <dt>Active installations (Home Assistant analytics)</dt>
+              <dd>{installs
+                ? <>{formatNumber(installs.total)}{installs.weekDelta !== null ? <small> {formatSignedNumber(installs.weekDelta)} this week</small> : null}</>
+                : <small>Not reported yet</small>}</dd>
+            </div>
+          </dl>
+          <p className="panel-intro">{installs
+            ? <>Installs that opted in to Home Assistant analytics for <code>{projectMeta?.installs?.domain}</code>; the real number is higher. That&rsquo;s {summary ? (summary.total / Math.max(1, installs.total)).toFixed(1) : '—'} downloads per reported install.</>
+            : <>Captured daily from Home Assistant&rsquo;s opt-in analytics when the integration&rsquo;s domain appears there. Set <code>haDomain</code> in <code>projects.json</code> if it differs from the zip name.</>}</p>
+        </aside>
+      </section>
+
+      {portfolioRows.length > 1 && (
+        <section className="panel portfolio-panel" aria-labelledby="portfolio-title">
+          <div className="card-heading">
+            <div>
+              <p className="eyebrow">Portfolio</p>
+              <h2 id="portfolio-title">All tracked projects</h2>
+            </div>
+            <Layers3 size={18} aria-hidden="true" />
+          </div>
+          <PortfolioTable rows={portfolioRows} onSelect={selectProject} />
+        </section>
+      )}
+
       <section className={`panel releases-panel scope-area${scopeClass('channel', 'window')}`} aria-labelledby="release-table-title">
         <div className="card-heading table-heading">
           <div>
@@ -1445,12 +1766,27 @@ export default function Home() {
               {!summary && <tr className="empty-row"><td colSpan={hasAssetBreakdown ? 8 : 7}>{emptyNote}</td></tr>}
               {tableReleases.map((release) => {
                 const share = scopedTotal ? (release.downloads / scopedTotal) * 100 : 0;
+                const insight = releaseInsights.get(release.version);
+                const isExpanded = expandedVersion === release.version;
                 return (
-                  <tr key={release.version} className={release.prerelease ? 'is-prerelease' : ''}>
+                  <Fragment key={release.version}>
+                  <tr className={`${release.prerelease ? 'is-prerelease' : ''}${isExpanded ? ' is-expanded' : ''}`}>
                     <td>
-                      <span className="release-version">{release.version}</span>
+                      <button
+                        aria-expanded={isExpanded}
+                        aria-label={`${isExpanded ? 'Hide' : 'Show'} details for ${release.version}`}
+                        className="expand-button"
+                        onClick={() => setExpandedVersion(isExpanded ? null : release.version)}
+                        type="button"
+                      >
+                        <ChevronRight size={13} aria-hidden="true" />
+                        <span className="release-version">{release.version}</span>
+                      </button>
                       {release.version === summary?.latest.version && <span className="latest-tag">Latest</span>}
                       {release.prerelease && <span className="prerelease-tag">Pre-release</span>}
+                      {insight && insight.issues.length > 0 && <span className="mini-badge is-issue" title={`${insight.issues.length} issues opened within 72 hours`}><Bug size={10} aria-hidden="true" />{insight.issues.length}</span>}
+                      {insight?.hotfix && <span className="mini-badge is-hotfix" title={`Followed by ${insight.hotfix.version} within 48 hours`}><Wrench size={10} aria-hidden="true" />Hotfixed</span>}
+                      {release.reactions && <span className="mini-badge" title={`${release.reactions.total} reactions on the release notes`}><Heart size={10} aria-hidden="true" />{release.reactions.total}</span>}
                     </td>
                     <td><span className="date-cell" title={formatDate(release.publishedAt)}><CalendarDays size={14} /> {formatShortDate(release.publishedAt)}<small>{formatAge(release.publishedAt)}</small></span></td>
                     {hasAssetBreakdown && secondaryAsset
@@ -1464,6 +1800,26 @@ export default function Home() {
                     <td className="align-right"><strong className="download-count">{formatNumber(release.downloads)}</strong></td>
                     <td><a className="row-link" href={release.url} target="_blank" rel="noreferrer" aria-label={`Open ${release.version} release`}><ExternalLink size={14} /></a></td>
                   </tr>
+                  {isExpanded && insight && (
+                    <tr className="detail-row">
+                      <td colSpan={hasAssetBreakdown ? 8 : 7}>
+                        <ReleaseDetail
+                          curve={insight.curve}
+                          firstWeek={insight.firstWeek}
+                          hotfix={insight.hotfix}
+                          issues={insight.issues}
+                          majorityDays={insight.majorityDays}
+                          milestones={insight.milestones}
+                          points={insight.input.points}
+                          publishedAt={insight.input.publishedAt}
+                          reactions={release.reactions}
+                          resets={insight.resets}
+                          version={release.version}
+                        />
+                      </td>
+                    </tr>
+                  )}
+                  </Fragment>
                 );
               })}
             </tbody>
