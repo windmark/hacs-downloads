@@ -813,12 +813,20 @@ export default function Home() {
     return () => window.clearTimeout(timer);
   }, [linkState]);
 
+  // Hover and keyboard focus preview which sections a filter affects. A click only
+  // flashes the affected sections, so nothing stays dimmed after a selection.
+  const previewScope = (kind: ScopeKind, target: EventTarget) => {
+    if (target instanceof HTMLElement && target.matches(':focus-visible')) setScopeFocus(kind);
+  };
+
   const setReleaseWindow = (next: ReleaseWindow) => {
+    setScopeFocus(null);
     setReleaseWindowState(next);
     setScopeFlash('window');
   };
 
   const setIncludePrereleases = (next: boolean) => {
+    setScopeFocus(null);
     setIncludePrereleasesState(next);
     setScopeFlash('channel');
   };
@@ -833,9 +841,9 @@ export default function Home() {
   };
 
   const scopeClass = (...targets: ScopeKind[]) => {
-    const active = scopeFocus ?? scopeFlash;
-    if (!active) return '';
-    return targets.includes(active) ? ` scope-target${scopeFlash === active && !scopeFocus ? ' scope-flash' : ''}` : ' scope-muted';
+    if (scopeFocus) return targets.includes(scopeFocus) ? ' scope-target' : ' scope-muted';
+    if (scopeFlash && targets.includes(scopeFlash)) return ' scope-target scope-flash';
+    return '';
   };
 
   const selectProject = (nextProjectId: string) => {
@@ -1144,9 +1152,9 @@ export default function Home() {
         <div
           className={`scope-group${(scopeFocus ?? scopeFlash) === 'channel' ? ' is-active' : ''}`}
           onBlur={() => setScopeFocus(null)}
-          onFocus={() => setScopeFocus('channel')}
-          onMouseEnter={() => setScopeFocus('channel')}
-          onMouseLeave={() => setScopeFocus(null)}
+          onFocus={(event) => previewScope('channel', event.target)}
+          onPointerEnter={(event) => { if (event.pointerType === 'mouse') setScopeFocus('channel'); }}
+          onPointerLeave={() => setScopeFocus(null)}
         >
           <span className="scope-label" id="channel-label"><FlaskConical size={12} aria-hidden="true" /> Release channel</span>
           <div className="segmented-control" role="radiogroup" aria-labelledby="channel-label">
@@ -1162,9 +1170,9 @@ export default function Home() {
         <div
           className={`scope-group${(scopeFocus ?? scopeFlash) === 'window' ? ' is-active' : ''}`}
           onBlur={() => setScopeFocus(null)}
-          onFocus={() => setScopeFocus('window')}
-          onMouseEnter={() => setScopeFocus('window')}
-          onMouseLeave={() => setScopeFocus(null)}
+          onFocus={(event) => previewScope('window', event.target)}
+          onPointerEnter={(event) => { if (event.pointerType === 'mouse') setScopeFocus('window'); }}
+          onPointerLeave={() => setScopeFocus(null)}
         >
           <span className="scope-label" id="window-label"><Layers3 size={12} aria-hidden="true" /> Compare</span>
           <div className="segmented-control" role="radiogroup" aria-labelledby="window-label">

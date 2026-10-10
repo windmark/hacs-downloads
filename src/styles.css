@@ -290,7 +290,7 @@ a { color: inherit; text-decoration: none; }
 .stats-grid.scope-area { border-radius: 19px; }
 .scope-target { box-shadow: 0 0 0 2px rgb(25 198 173 / 55%), 0 16px 50px rgb(16 37 63 / 7%); }
 .stats-grid.scope-target { box-shadow: 0 0 0 2px rgb(25 198 173 / 55%); outline-offset: 4px; }
-.scope-muted { filter: saturate(.4); opacity: .45; }
+.scope-muted { filter: saturate(.6); opacity: .6; }
 .scope-flash { animation: scope-flash 1.1s ease-out; }
 .scope-chip { align-items: center; background: #e9f6f4; border-radius: 999px; color: var(--teal-dark); display: inline-flex; font-size: 9px; font-weight: 750; gap: 4px; margin-top: 8px; padding: 3px 8px 3px 6px; }
 @keyframes scope-flash { 0% { box-shadow: 0 0 0 6px rgb(25 198 173 / 40%); } 100% { box-shadow: 0 0 0 2px rgb(25 198 173 / 0%); } }
