@@ -43,11 +43,11 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           for attempt in 1 2 3; do
-            if git diff --quiet -- public/download-history.json; then
+            if git diff --quiet -- public/download-history.json public/project-meta.json; then
               echo "Download history is already current."
               exit 0
             fi
-            git add public/download-history.json
+            git add public/download-history.json public/project-meta.json
             git commit -m "chore: capture download history"
             if git push origin HEAD:main; then
               exit 0
