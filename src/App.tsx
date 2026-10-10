@@ -2,17 +2,24 @@
 
 import {
   Activity,
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
   BarChart3,
   CalendarDays,
   Check,
   ChevronDown,
   Download,
   ExternalLink,
+  FileDown,
+  FlaskConical,
   GitBranch,
   Info,
   Layers3,
+  Link2,
   Package,
   RefreshCw,
+  SlidersHorizontal,
   Sparkles,
   Star,
   TrendingUp,
@@ -22,6 +29,21 @@ import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, ReactNode } fr
 import projectConfigs from './projects.json';
 import { formatGitHubStarCount, parseGitHubStarCount } from './github';
 import { buildReleaseComparison, filterPrereleases, formatReleaseAge } from './releaseComparison';
+import {
+  RECENT_RELEASE_COUNT,
+  applyReleaseWindow,
+  buildShareSegments,
+  conicGradient,
+  daysToRecord,
+  downloadsPerDay,
+  formatRate,
+  isPrerelease,
+  isPrereleaseTag,
+  releaseAgeDays,
+  sortReleases,
+  toCsv,
+} from './analytics';
+import type { ReleaseWindow, SortDirection, SortKey } from './analytics';
 
 type AssetMatcher =
   | { assetName: string; assetNameTemplate?: never }
@@ -127,6 +149,30 @@ const PROJECTS = projectConfigs as readonly ProjectConfig[];
 const DEFAULT_PROJECT_ID = PROJECTS[0].id;
 const LAST_PROJECT_KEY = 'hacs-downloads-selected-project-v1';
 const RATE_LIMIT_RESET_KEY = 'hacs-downloads-rate-limit-reset-v1';
+const FILTERS_KEY = 'hacs-downloads-filters-v1';
+const SHARE_COLORS = ['#19c6ad', '#0b8e81', '#7adccd', '#16526b', '#b4ece2'];
+const SHARE_OTHER_COLOR = '#cbd7df';
+const SHARE_TRACK_COLOR = '#e8eef2';
+
+type ScopeKind = 'channel' | 'window';
+type Filters = { releaseWindow: ReleaseWindow; includePrereleases: boolean };
+
+function getInitialFilters(): Filters {
+  const filters: Filters = { releaseWindow: 'recent', includePrereleases: false };
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(FILTERS_KEY) ?? 'null') as Partial<Filters> | null;
+    if (stored?.releaseWindow === 'all' || stored?.releaseWindow === 'recent') filters.releaseWindow = stored.releaseWindow;
+    if (typeof stored?.includePrereleases === 'boolean') filters.includePrereleases = stored.includePrereleases;
+    const params = new URLSearchParams(window.location.search);
+    const queryWindow = params.get('releases');
+    if (queryWindow === 'all' || queryWindow === 'recent') filters.releaseWindow = queryWindow;
+    const queryPrereleases = params.get('prereleases');
+    if (queryPrereleases === '1' || queryPrereleases === '0') filters.includePrereleases = queryPrereleases === '1';
+  } catch {
+    // Defaults apply when URL or storage access is unavailable.
+  }
+  return filters;
+}
 const REFRESH_INTERVAL_MS = 300_000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -369,6 +415,23 @@ function AssetLegend({ assets }: { assets: [TrackedAssetConfig, TrackedAssetConf
   );
 }
 
+function ScopeChip({ label }: { label: string }) {
+  return <span className="scope-chip"><SlidersHorizontal size={10} aria-hidden="true" />{label}</span>;
+}
+
+function formatShortDate(value: string) {
+  return new Intl.DateTimeFormat('en', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }).format(new Date(value));
+}
+
+function formatAge(value: string) {
+  const days = Math.floor((Date.now() - Date.parse(value)) / DAY_MS);
+  if (Number.isNaN(days)) return '';
+  if (days < 1) return 'today';
+  if (days < 30) return `${days}d ago`;
+  if (days < 365) return `${Math.round(days / 30)}mo ago`;
+  return `${(days / 365).toFixed(1)}y ago`;
+}
+
 function formatSignedNumber(value: number) {
   if (value === 0) return '0';
   return `${value > 0 ? '+' : '−'}${formatNumber(Math.abs(value))}`;
@@ -544,8 +607,14 @@ export default function Home() {
   const [refreshState, setRefreshState] = useState<'idle' | 'refreshing' | 'updated' | 'error'>('idle');
   const [lastUpdated, setLastUpdated] = useState<Date | null>(() => initialSnapshot ? new Date(initialSnapshot.updatedAt) : null);
   const [rateLimitReset, setRateLimitReset] = useState<number | null>(initialRateLimitReset);
-  const [range, setRange] = useState<'all' | 'recent'>('recent');
-  const [includePrereleases, setIncludePrereleases] = useState(true);
+  const [initialFilters] = useState(getInitialFilters);
+  const [releaseWindow, setReleaseWindowState] = useState<ReleaseWindow>(initialFilters.releaseWindow);
+  const [includePrereleases, setIncludePrereleasesState] = useState(initialFilters.includePrereleases);
+  const [scopeFocus, setScopeFocus] = useState<ScopeKind | null>(null);
+  const [scopeFlash, setScopeFlash] = useState<ScopeKind | null>(null);
+  const [chartMetric, setChartMetric] = useState<'total' | 'rate'>('total');
+  const [sort, setSort] = useState<{ key: SortKey; direction: SortDirection }>({ key: 'published', direction: 'desc' });
+  const [linkState, setLinkState] = useState<'idle' | 'copied' | 'error'>('idle');
   const [growthRange, setGrowthRange] = useState<'daily' | 'weekly'>('daily');
   const [history, setHistory] = useState<DownloadHistory | null>(null);
   const [historyStatus, setHistoryStatus] = useState<'loading' | 'ready' | 'error'>('loading');
@@ -720,6 +789,55 @@ export default function Home() {
     document.querySelector('meta[property="og:description"]')?.setAttribute('content', description);
   }, [project]);
 
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(FILTERS_KEY, JSON.stringify({ releaseWindow, includePrereleases }));
+      const url = new URL(window.location.href);
+      url.searchParams.set('releases', releaseWindow);
+      url.searchParams.set('prereleases', includePrereleases ? '1' : '0');
+      window.history.replaceState({}, '', url);
+    } catch {
+      // Filters still apply for the current page without storage or history access.
+    }
+  }, [includePrereleases, releaseWindow]);
+
+  useEffect(() => {
+    if (!scopeFlash) return;
+    const timer = window.setTimeout(() => setScopeFlash(null), 1_100);
+    return () => window.clearTimeout(timer);
+  }, [scopeFlash]);
+
+  useEffect(() => {
+    if (linkState === 'idle') return;
+    const timer = window.setTimeout(() => setLinkState('idle'), 1_800);
+    return () => window.clearTimeout(timer);
+  }, [linkState]);
+
+  const setReleaseWindow = (next: ReleaseWindow) => {
+    setReleaseWindowState(next);
+    setScopeFlash('window');
+  };
+
+  const setIncludePrereleases = (next: boolean) => {
+    setIncludePrereleasesState(next);
+    setScopeFlash('channel');
+  };
+
+  const copyShareLink = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setLinkState('copied');
+    } catch {
+      setLinkState('error');
+    }
+  };
+
+  const scopeClass = (...targets: ScopeKind[]) => {
+    const active = scopeFocus ?? scopeFlash;
+    if (!active) return '';
+    return targets.includes(active) ? ` scope-target${scopeFlash === active && !scopeFocus ? ' scope-flash' : ''}` : ' scope-muted';
+  };
+
   const selectProject = (nextProjectId: string) => {
     const nextProject = getProject(nextProjectId);
     const cachedSnapshot = readCachedSnapshot(nextProject.id);
@@ -729,7 +847,6 @@ export default function Home() {
     setLastUpdated(cachedSnapshot ? new Date(cachedSnapshot.updatedAt) : null);
     setStatus(rateLimitResetRef.current && rateLimitResetRef.current > Date.now() ? 'limited' : 'loading');
     setRefreshState('idle');
-    setRange('recent');
     try {
       window.localStorage.setItem(LAST_PROJECT_KEY, nextProject.id);
       const url = new URL(window.location.href);
@@ -740,14 +857,23 @@ export default function Home() {
     }
   };
 
-  const allReleases = snapshot?.releases ?? [];
+  const allReleases = useMemo(
+    () => (snapshot?.releases ?? []).map((release) => ({ ...release, prerelease: isPrerelease(release) })),
+    [snapshot],
+  );
   const prereleaseVersions = useMemo(() => new Set([
     ...allReleases.filter((release) => release.prerelease).map((release) => release.version),
     ...(history?.snapshots ?? []).flatMap((historySnapshot) => {
-      const versions = historySnapshot.projects[project.id]?.prereleases;
-      return Array.isArray(versions) ? versions.filter((version): version is string => typeof version === 'string') : [];
+      const projectSnapshot = historySnapshot.projects[project.id];
+      if (!projectSnapshot) return [];
+      const versions = Array.isArray(projectSnapshot.prereleases)
+        ? projectSnapshot.prereleases.filter((version): version is string => typeof version === 'string')
+        : [];
+      return [...versions, ...Object.keys(projectSnapshot.releases ?? {}).filter(isPrereleaseTag)];
     }),
   ]), [allReleases, history, project.id]);
+  const prereleaseCount = allReleases.filter((release) => release.prerelease).length;
+  const stableCount = allReleases.length - prereleaseCount;
   const releases = useMemo(
     () => filterPrereleases(allReleases, includePrereleases),
     [allReleases, includePrereleases],
@@ -773,6 +899,19 @@ export default function Home() {
     asset.id,
     releases.reduce((sum, release) => sum + (release.assets?.[asset.id]?.downloads ?? 0), 0),
   ])), [releases, trackedAssets]);
+  const scopedReleases = useMemo(() => applyReleaseWindow(releases, releaseWindow), [releaseWindow, releases]);
+  const scopedTotal = scopedReleases.reduce((sum, release) => sum + release.downloads, 0);
+  const scopedAssetTotals = useMemo(() => Object.fromEntries(trackedAssets.map((asset) => [
+    asset.id,
+    scopedReleases.reduce((sum, release) => sum + (release.assets?.[asset.id]?.downloads ?? 0), 0),
+  ])), [scopedReleases, trackedAssets]);
+  const shareSegments = useMemo(() => buildShareSegments(scopedReleases), [scopedReleases]);
+  const shareColors = shareSegments.map((segment, index) => segment.isOther ? SHARE_OTHER_COLOR : SHARE_COLORS[index % SHARE_COLORS.length]);
+  const tableReleases = useMemo(() => sortReleases(scopedReleases, sort.key, sort.direction), [scopedReleases, sort]);
+  const channelLabel = includePrereleases ? 'releases incl. pre-releases' : 'stable releases';
+  const scopeLabel = releaseWindow === 'recent' && releases.length > RECENT_RELEASE_COUNT
+    ? `Last ${RECENT_RELEASE_COUNT} ${channelLabel}`
+    : `All ${releases.length} ${channelLabel}`;
 
   const summary = useMemo(() => {
     if (!releases.length) return null;
@@ -844,11 +983,14 @@ export default function Home() {
   const growthComparison = latestGrowth && previousGrowth && previousGrowth.value > 0
     ? ((latestGrowth.value - previousGrowth.value) / previousGrowth.value) * 100
     : null;
+  const growthAverage = growthSeries.length
+    ? growthSeries.reduce((sum, point) => sum + point.value, 0) / growthSeries.length
+    : null;
+  const growthPeak = growthSeries.reduce<GrowthSeriesPoint | null>((peak, point) => (
+    point.value > 0 && (!peak || point.value > peak.value) ? point : peak
+  ), null);
 
-  const chartReleases = useMemo(() => {
-    const selected = range === 'recent' ? releases.slice(0, 5) : releases;
-    return [...selected].reverse();
-  }, [range, releases]);
+  const chartReleases = useMemo(() => [...scopedReleases].reverse(), [scopedReleases]);
   const latestChartVersion = chartReleases.at(-1)?.version;
 
   const releaseComparison = useMemo(() => buildReleaseComparison(releases), [releases]);
@@ -856,15 +998,25 @@ export default function Home() {
   useLayoutEffect(() => {
     const chartArea = chartAreaRef.current;
     if (chartArea) chartArea.scrollLeft = chartArea.scrollWidth;
-  }, [latestChartVersion, project.id, range]);
+  }, [latestChartVersion, project.id, releaseWindow]);
 
+  const chartValue = (release: ReleaseMetric) => chartMetric === 'rate' ? downloadsPerDay(release) : release.downloads;
   const maxDownloads = Math.max(
-    1,
-    releaseComparison?.previousBest.downloads ?? 0,
-    ...chartReleases.map((release) => release.downloads),
+    chartMetric === 'rate' ? 0.1 : 1,
+    chartMetric === 'total' ? releaseComparison?.previousBest.downloads ?? 0 : 0,
+    ...chartReleases.map(chartValue),
   );
-  const benchmarkLineTop = releaseComparison
+  const benchmarkLineTop = releaseComparison && chartMetric === 'total'
     ? 20 + (1 - (releaseComparison.previousBest.downloads / maxDownloads)) * 236
+    : null;
+  const latestDailyPace = metricGrowth?.latest.week
+    ? metricGrowth.latest.week.absolute / 7
+    : metricGrowth?.latest.day?.absolute ?? null;
+  const recordEta = releaseComparison?.state === 'behind'
+    ? daysToRecord(Math.abs(releaseComparison.difference), latestDailyPace)
+    : null;
+  const latestMomentum = summary && metricGrowth?.latest.week && metricGrowth.total.week && metricGrowth.total.week.absolute > 0
+    ? Math.round((metricGrowth.latest.week.absolute / metricGrowth.total.week.absolute) * 100)
     : null;
   const benchmarkRecordPosition = releaseComparison?.state === 'ahead'
     ? (releaseComparison.previousBest.downloads / releaseComparison.latest.downloads) * 100
@@ -874,7 +1026,9 @@ export default function Home() {
     ? 'Loading live GitHub data…'
     : status === 'limited'
       ? 'GitHub rate limit reached; retry is automatic'
-      : status === 'ready' && releases.length === 0
+      : status === 'ready' && releases.length === 0 && allReleases.length > 0
+        ? 'Only pre-releases so far. Switch the release channel to include them.'
+        : status === 'ready' && releases.length === 0
         ? 'This repository has no release assets to count'
         : 'GitHub data is temporarily unavailable';
   const repositoryUrl = `https://github.com/${project.owner}/${project.repo}`;
@@ -882,9 +1036,39 @@ export default function Home() {
   const stars = snapshot?.stars;
   const primaryAsset = trackedAssets[0];
   const secondaryAsset = trackedAssets[1];
-  const primaryAssetDownloads = assetTotals[primaryAsset.id] ?? 0;
-  const secondaryAssetDownloads = secondaryAsset ? assetTotals[secondaryAsset.id] ?? 0 : 0;
-  const primaryAssetShare = summary?.total ? Math.round((primaryAssetDownloads / summary.total) * 100) : 0;
+  const scopedPrimaryDownloads = scopedAssetTotals[primaryAsset.id] ?? 0;
+  const scopedSecondaryDownloads = secondaryAsset ? scopedAssetTotals[secondaryAsset.id] ?? 0 : 0;
+  const primaryAssetShare = scopedTotal ? Math.round((scopedPrimaryDownloads / scopedTotal) * 100) : 0;
+
+  const toggleSort = (key: SortKey) => setSort((current) => (
+    current.key === key ? { key, direction: current.direction === 'desc' ? 'asc' : 'desc' } : { key, direction: 'desc' }
+  ));
+  const sortIcon = (key: SortKey) => sort.key !== key
+    ? <ArrowUpDown size={11} aria-hidden="true" />
+    : sort.direction === 'desc' ? <ArrowDown size={11} aria-hidden="true" /> : <ArrowUp size={11} aria-hidden="true" />;
+  const ariaSort = (key: SortKey) => sort.key === key ? (sort.direction === 'desc' ? 'descending' : 'ascending') : 'none';
+
+  const exportCsv = () => {
+    const assetHeaders = hasAssetBreakdown ? trackedAssets.map((asset) => `${asset.label} downloads`) : [];
+    const rows = [
+      ['Version', 'Published', 'Pre-release', ...assetHeaders, 'Downloads', 'Downloads per day', 'URL'],
+      ...tableReleases.map((release) => [
+        release.version,
+        release.publishedAt,
+        release.prerelease,
+        ...(hasAssetBreakdown ? trackedAssets.map((asset) => release.assets?.[asset.id]?.downloads ?? 0) : []),
+        release.downloads,
+        Number(downloadsPerDay(release).toFixed(2)),
+        release.url,
+      ]),
+    ];
+    const blob = new Blob([toCsv(rows)], { type: 'text/csv;charset=utf-8' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `${project.id}-${releaseWindow === 'recent' ? `last-${RECENT_RELEASE_COUNT}` : 'all'}-releases.csv`;
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(link.href), 1_000);
+  };
 
   return (
     <main className="dashboard-shell" id="top">
@@ -926,14 +1110,6 @@ export default function Home() {
           <p className="hero-copy">A clear, live view of release asset downloads across every tracked release of <strong>{project.name}</strong>.</p>
         </div>
         <div className="hero-actions">
-          <label className="prerelease-toggle">
-            <input
-              checked={includePrereleases}
-              onChange={(event) => setIncludePrereleases(event.target.checked)}
-              type="checkbox"
-            />
-            Include pre-releases
-          </label>
           <div className="hero-refresh">
             <span>Last refreshed</span>
             <strong>{timeAgo(lastUpdated)}</strong>
@@ -963,7 +1139,54 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="stats-grid" aria-label={`${project.name} release download summary`}>
+      <section className="scope-bar" aria-label="Release filters">
+        <span className="scope-title"><SlidersHorizontal size={14} aria-hidden="true" /> Filters</span>
+        <div
+          className={`scope-group${(scopeFocus ?? scopeFlash) === 'channel' ? ' is-active' : ''}`}
+          onBlur={() => setScopeFocus(null)}
+          onFocus={() => setScopeFocus('channel')}
+          onMouseEnter={() => setScopeFocus('channel')}
+          onMouseLeave={() => setScopeFocus(null)}
+        >
+          <span className="scope-label" id="channel-label"><FlaskConical size={12} aria-hidden="true" /> Release channel</span>
+          <div className="segmented-control" role="radiogroup" aria-labelledby="channel-label">
+            <button aria-checked={!includePrereleases} className={!includePrereleases ? 'active' : ''} onClick={() => setIncludePrereleases(false)} role="radio" type="button">
+              Stable <em>{stableCount}</em>
+            </button>
+            <button aria-checked={includePrereleases} className={includePrereleases ? 'active' : ''} onClick={() => setIncludePrereleases(true)} role="radio" type="button">
+              <span className="label-long">With pre-releases</span><span className="label-short">+ Pre</span> <em>{allReleases.length}</em>
+            </button>
+          </div>
+          <small className="scope-hint">Applies to every section</small>
+        </div>
+        <div
+          className={`scope-group${(scopeFocus ?? scopeFlash) === 'window' ? ' is-active' : ''}`}
+          onBlur={() => setScopeFocus(null)}
+          onFocus={() => setScopeFocus('window')}
+          onMouseEnter={() => setScopeFocus('window')}
+          onMouseLeave={() => setScopeFocus(null)}
+        >
+          <span className="scope-label" id="window-label"><Layers3 size={12} aria-hidden="true" /> Compare</span>
+          <div className="segmented-control" role="radiogroup" aria-labelledby="window-label">
+            <button aria-checked={releaseWindow === 'recent'} className={releaseWindow === 'recent' ? 'active' : ''} onClick={() => setReleaseWindow('recent')} role="radio" type="button">
+              Last {RECENT_RELEASE_COUNT}
+            </button>
+            <button aria-checked={releaseWindow === 'all'} className={releaseWindow === 'all' ? 'active' : ''} onClick={() => setReleaseWindow('all')} role="radio" type="button">
+              All <em>{releases.length}</em>
+            </button>
+          </div>
+          <small className="scope-hint">Applies to chart, share and table</small>
+        </div>
+        <div className="scope-summary">
+          <span aria-live="polite">{scopeLabel}</span>
+          <button className={`scope-link state-${linkState}`} onClick={() => void copyShareLink()} type="button">
+            {linkState === 'copied' ? <Check size={13} aria-hidden="true" /> : <Link2 size={13} aria-hidden="true" />}
+            {linkState === 'copied' ? 'Link copied' : linkState === 'error' ? 'Copy failed' : 'Copy link'}
+          </button>
+        </div>
+      </section>
+
+      <section className={`stats-grid scope-area${scopeClass('channel')}`} aria-label={`${project.name} release download summary`}>
         {hasAssetBreakdown && secondaryAsset ? <>
           <StatCard loading={isInitialLoad} historyStatus={historyStatus} growth={metricGrowth?.total} label="Tracked downloads" value={summary ? formatNumber(summary.total) : '—'} icon={<Download size={18} />} note={summary ? <>Across {releases.length} tracked releases</> : emptyNote} />
           <StatCard loading={isInitialLoad} historyStatus={historyStatus} growth={metricGrowth?.assets[primaryAsset.id]} label={`${primaryAsset.label} downloads`} value={summary ? formatNumber(assetTotals[primaryAsset.id] ?? 0) : '—'} icon={<Package size={18} />} note={summary ? <>GitHub release asset requests</> : emptyNote} />
@@ -971,17 +1194,18 @@ export default function Home() {
           <StatCard loading={isInitialLoad} historyStatus={historyStatus} growth={metricGrowth?.latest} label="Latest release" value={summary ? formatNumber(summary.latest.downloads) : '—'} icon={<Activity size={18} />} note={summary ? <><span className="version-chip">{summary.latest.version}</span> tracked downloads</> : emptyNote} />
         </> : <>
           <StatCard loading={isInitialLoad} historyStatus={historyStatus} growth={metricGrowth?.total} label="Release downloads" value={summary ? formatNumber(summary.total) : '—'} icon={<Download size={18} />} note={summary ? <>Across {releases.length} tracked releases</> : emptyNote} />
-          <StatCard loading={isInitialLoad} historyStatus={historyStatus} growth={metricGrowth?.latest} label="Latest release" value={summary ? formatNumber(summary.latest.downloads) : '—'} icon={<Activity size={18} />} note={summary ? <><span className="version-chip">{summary.latest.version}</span> asset downloads</> : emptyNote} />
+          <StatCard loading={isInitialLoad} historyStatus={historyStatus} growth={metricGrowth?.latest} label="Latest release" value={summary ? formatNumber(summary.latest.downloads) : '—'} icon={<Activity size={18} />} note={summary ? <><span className="version-chip">{summary.latest.version}</span> {formatRate(downloadsPerDay(summary.latest))}/day over {Math.round(releaseAgeDays(summary.latest.publishedAt))}d</> : emptyNote} />
           <StatCard loading={isInitialLoad} historyStatus={historyStatus} growth={metricGrowth?.leader} label="Most downloaded" value={summary ? formatNumber(summary.leader.downloads) : '—'} icon={<TrendingUp size={18} />} note={summary ? <><span className="version-chip">{summary.leader.version}</span> · {summary.leaderShare}% of total</> : emptyNote} />
           <StatCard loading={isInitialLoad} historyStatus={historyStatus} growth={metricGrowth?.average} label="Active-release avg." value={summary ? formatNumber(summary.average) : '—'} icon={<BarChart3 size={18} />} note={summary ? <>Average among downloaded versions</> : emptyNote} />
         </>}
       </section>
 
-      <section className="panel growth-panel" aria-labelledby="growth-title">
+      <section className={`panel growth-panel scope-area${scopeClass('channel')}`} aria-labelledby="growth-title">
         <div className="card-heading growth-heading">
           <div>
             <p className="eyebrow">Growth</p>
             <h2 id="growth-title">Download velocity</h2>
+            <ScopeChip label={includePrereleases ? 'Including pre-releases' : 'Stable releases'} />
             {hasAssetBreakdown && secondaryAsset && <AssetLegend assets={[primaryAsset, secondaryAsset]} />}
           </div>
           <div className="segmented-control" aria-label="Growth interval">
@@ -1006,7 +1230,7 @@ export default function Home() {
                 const secondaryDownloads = secondaryAsset ? point.assets?.[secondaryAsset.id] ?? 0 : 0;
                 const showAssetStack = hasAssetBreakdown && secondaryAsset && primaryDownloads >= 0 && secondaryDownloads >= 0;
                 return (
-                <div className="velocity-column" key={point.capturedAt} aria-label={`${point.label}: ${point.value} new ${hasAssetBreakdown ? `tracked downloads, ${primaryDownloads} ${primaryAsset.label}, ${secondaryDownloads} ${secondaryAsset?.label}` : 'downloads'}`}>
+                <div className={`velocity-column${growthPeak?.capturedAt === point.capturedAt ? ' is-peak' : ''}`} key={point.capturedAt} aria-label={`${point.label}: ${point.value} new ${hasAssetBreakdown ? `tracked downloads, ${primaryDownloads} ${primaryAsset.label}, ${secondaryDownloads} ${secondaryAsset?.label}` : 'downloads'}`}>
                   <span className="velocity-value">{formatSignedNumber(point.value)}</span>
                   <span className="velocity-track">
                     {showAssetStack
@@ -1034,22 +1258,29 @@ export default function Home() {
             <div className={`growth-comparison${growthComparison !== null && growthComparison < 0 ? ' is-down' : ''}`}>
               {growthComparison === null ? 'Waiting for a prior period' : `${formatGrowthPercentage(growthComparison)} vs prior period`}
             </div>
+            {growthAverage !== null && (
+              <dl className="growth-stats">
+                <div><dt>Average</dt><dd>{formatSignedNumber(Math.round(growthAverage))}<small>/{growthRange === 'daily' ? 'day' : 'week'}</small></dd></div>
+                <div><dt>Peak</dt><dd>{growthPeak ? <>{formatSignedNumber(growthPeak.value)}<small>{growthPeak.label}</small></> : '—'}</dd></div>
+              </dl>
+            )}
             <p>History is captured daily at approximately 04:17 UTC.</p>
           </aside>
         </div>
       </section>
 
       <section className="analytics-grid">
-        <article className="panel chart-card" aria-labelledby="release-performance-title">
+        <article className={`panel chart-card scope-area${scopeClass('channel', 'window')}`} aria-labelledby="release-performance-title">
           <div className="card-heading">
             <div>
               <p className="eyebrow">Release performance</p>
-              <h2 id="release-performance-title">Release downloads by version</h2>
+              <h2 id="release-performance-title">{chartMetric === 'total' ? 'Release downloads by version' : 'Downloads per day since release'}</h2>
+              <ScopeChip label={scopeLabel} />
               {hasAssetBreakdown && secondaryAsset && <AssetLegend assets={[primaryAsset, secondaryAsset]} />}
             </div>
-            <div className="segmented-control" aria-label="Chart range">
-              <button className={range === 'recent' ? 'active' : ''} onClick={() => setRange('recent')} type="button">Recent 5</button>
-              <button className={range === 'all' ? 'active' : ''} onClick={() => setRange('all')} type="button">All</button>
+            <div className="segmented-control" role="radiogroup" aria-label="Chart metric">
+              <button aria-checked={chartMetric === 'total'} className={chartMetric === 'total' ? 'active' : ''} onClick={() => setChartMetric('total')} role="radio" type="button">Total</button>
+              <button aria-checked={chartMetric === 'rate'} className={chartMetric === 'rate' ? 'active' : ''} onClick={() => setChartMetric('rate')} role="radio" type="button" title="Downloads divided by days since release, for a fair comparison between old and new versions">Per day</button>
             </div>
           </div>
           {releaseComparison && (
@@ -1074,7 +1305,7 @@ export default function Home() {
                 ? `${formatSignedNumber(releaseComparison.difference)} vs ${releaseComparison.previousBest.version}`
                 : releaseComparison.state === 'matched'
                   ? `Matched ${releaseComparison.previousBest.version}`
-                  : `${formatNumber(Math.abs(releaseComparison.difference))} to match ${releaseComparison.previousBest.version}`}</span>
+                  : `${formatNumber(Math.abs(releaseComparison.difference))} to match ${releaseComparison.previousBest.version}${recordEta ? ` · ≈${recordEta} ${recordEta === 1 ? 'day' : 'days'} at current pace` : ''}`}</span>
             </div>
           )}
           <div
@@ -1092,18 +1323,19 @@ export default function Home() {
               {!summary && <div className={`data-placeholder${isInitialLoad ? ' is-loading' : ''}`}>{emptyNote}</div>}
               {chartReleases.map((release) => {
                 const isLatest = release.version === releaseComparison?.latest.version;
+                const value = chartValue(release);
                 const primaryDownloads = release.assets?.[primaryAsset.id]?.downloads ?? 0;
                 const secondaryDownloads = secondaryAsset ? release.assets?.[secondaryAsset.id]?.downloads ?? 0 : 0;
                 return (
-                <a className={`bar-column${isLatest ? ' is-latest' : ''}`} href={release.url} target="_blank" rel="noreferrer" key={release.version} aria-label={`${release.version}: ${release.downloads} downloads${hasAssetBreakdown && secondaryAsset ? `, ${primaryDownloads} ${primaryAsset.label}, ${secondaryDownloads} ${secondaryAsset.label}` : ''}${isLatest && releaseComparison ? `, ${formatReleaseAge(releaseComparison.ageDays).toLowerCase()}` : ''}`}>
-                  <span className="bar-value">{release.downloads || '–'}</span>
+                <a className={`bar-column${isLatest ? ' is-latest' : ''}${release.prerelease ? ' is-prerelease' : ''}`} href={release.url} target="_blank" rel="noreferrer" key={release.version} title={`${release.version}${release.prerelease ? ' (pre-release)' : ''}: ${formatNumber(release.downloads)} downloads, ${formatRate(downloadsPerDay(release))} per day`} aria-label={`${release.version}${release.prerelease ? ' pre-release' : ''}: ${release.downloads} downloads, ${formatRate(downloadsPerDay(release))} per day${hasAssetBreakdown && secondaryAsset ? `, ${primaryDownloads} ${primaryAsset.label}, ${secondaryDownloads} ${secondaryAsset.label}` : ''}${isLatest && releaseComparison ? `, ${formatReleaseAge(releaseComparison.ageDays).toLowerCase()}` : ''}`}>
+                  <span className="bar-value">{value ? (chartMetric === 'rate' ? formatRate(value) : formatNumber(value)) : '–'}</span>
                   <div className="bar-track">
                     {hasAssetBreakdown && secondaryAsset
-                      ? <span className="bar-stack" style={{ height: `${Math.max((release.downloads / maxDownloads) * 100, release.downloads ? 7 : 0)}%` }}>
+                      ? <span className="bar-stack" style={{ height: `${Math.max((value / maxDownloads) * 100, value ? 7 : 0)}%` }}>
                           {secondaryDownloads > 0 && <i className="bar-segment asset-secondary" style={{ flexGrow: secondaryDownloads }} />}
                           {primaryDownloads > 0 && <i className="bar-segment asset-primary" style={{ flexGrow: primaryDownloads }} />}
                         </span>
-                      : <span className="bar-fill" style={{ height: `${Math.max((release.downloads / maxDownloads) * 100, release.downloads ? 7 : 0)}%` }} />}
+                      : <span className="bar-fill" style={{ height: `${Math.max((value / maxDownloads) * 100, value ? 7 : 0)}%` }} />}
                   </div>
                   <span className={`bar-label${isLatest ? ' is-latest' : ''}`}>{release.version}</span>
                 </a>
@@ -1111,14 +1343,20 @@ export default function Home() {
               })}
             </div>
           </div>
-          <p className="chart-caption">{hasAssetBreakdown ? 'Stacked bars separate each tracked asset. ' : ''}New releases may need time to catch up. Select a bar to open it on GitHub.</p>
+          <p className="chart-caption">
+            {hasAssetBreakdown ? 'Stacked bars separate each tracked asset. ' : ''}
+            {includePrereleases && <span className="prerelease-key"><i aria-hidden="true" /> Striped bars are pre-releases. </span>}
+            {chartMetric === 'total' ? 'New releases may need time to catch up; switch to per day for a fair comparison. ' : 'Per day divides downloads by days since release (minimum one day). '}
+            Select a bar to open it on GitHub.
+          </p>
         </article>
 
-        <aside className="panel insight-card" aria-labelledby="distribution-title">
+        <aside className={`panel insight-card scope-area${scopeClass('channel', 'window')}`} aria-labelledby="distribution-title">
           <div className="card-heading compact">
             <div>
               <p className="eyebrow">Distribution</p>
               <h2 id="distribution-title">{hasAssetBreakdown ? 'Asset download share' : 'Release download share'}</h2>
+              <ScopeChip label={scopeLabel} />
             </div>
             <Package size={18} aria-hidden="true" />
           </div>
@@ -1130,92 +1368,105 @@ export default function Home() {
             </div>
             <div className="leader-row">
               <span><i /> {primaryAsset.label}s</span>
-              <strong>{formatNumber(primaryAssetDownloads)}</strong>
+              <strong>{formatNumber(scopedPrimaryDownloads)}</strong>
             </div>
             <div className="leader-row secondary">
               <span><i /> {secondaryAsset.label}s</span>
-              <strong>{formatNumber(secondaryAssetDownloads)}</strong>
+              <strong>{formatNumber(scopedSecondaryDownloads)}</strong>
             </div>
             <div className="insight-note">
               <TrendingUp size={16} />
-              <p><strong>{primaryAsset.label} downloads</strong> account for {primaryAssetShare}% of tracked download activity.</p>
+              <p><strong>{primaryAsset.label} downloads</strong> account for {primaryAssetShare}% of downloads in the {releaseWindow === 'recent' ? `last ${scopedReleases.length}` : 'tracked'} releases.</p>
             </div>
-          </> : summary ? <>
+          </> : summary && shareSegments.length ? <>
             <div className="donut-wrap">
-              <div className="donut" style={{ '--share': `${summary.leaderShare * 3.6}deg` } as CSSProperties}>
-                <div><strong>{summary.leaderShare}%</strong><span>top version</span></div>
+              <div className="donut" style={{ background: conicGradient(shareSegments, shareColors, SHARE_TRACK_COLOR) }}>
+                <div><strong>{Math.round(shareSegments[0].share)}%</strong><span>{shareSegments[0].label}</span></div>
               </div>
             </div>
-            <div className="leader-row">
-              <span><i /> {summary.leader.version}</span>
-              <strong>{formatNumber(summary.leader.downloads)}</strong>
-            </div>
-            <div className="leader-row secondary">
-              <span><i /> Other releases</span>
-              <strong>{formatNumber(summary.total - summary.leader.downloads)}</strong>
-            </div>
+            <ul className="share-legend">
+              {shareSegments.map((segment, index) => (
+                <li key={segment.id} className={segment.id === summary.latest.version ? 'is-latest' : ''}>
+                  <span><i style={{ background: shareColors[index] }} />{segment.label}{segment.id === summary.latest.version && <b className="latest-tag">Latest</b>}</span>
+                  <strong>{formatNumber(segment.downloads)}</strong>
+                  <small>{Math.round(segment.share)}%</small>
+                </li>
+              ))}
+            </ul>
             <div className="insight-note">
               <TrendingUp size={16} />
-              <p><strong>{summary.leader.version}</strong> currently drives most tracked download activity.</p>
+              {latestMomentum !== null
+                ? <p><strong>{latestMomentum}%</strong> of the past 7 days&rsquo; downloads went to <strong>{summary.latest.version}</strong>{latestMomentum >= 60 ? ', so users are moving to it quickly.' : latestMomentum >= 30 ? ', and adoption is building.' : ', so most users are still on older versions.'}</p>
+                : <p><strong>{shareSegments[0].label}</strong> leads with {Math.round(shareSegments[0].share)}% of downloads in this view.</p>}
             </div>
-          </> : <div className={`insight-placeholder${isInitialLoad ? ' is-loading' : ''}`}>{emptyNote}</div>}
+          </> : <div className={`insight-placeholder${isInitialLoad ? ' is-loading' : ''}`}>{summary ? 'No downloads recorded in this view yet' : emptyNote}</div>}
         </aside>
       </section>
 
-      <section className="panel releases-panel" aria-labelledby="release-table-title">
+      <section className={`panel releases-panel scope-area${scopeClass('channel', 'window')}`} aria-labelledby="release-table-title">
         <div className="card-heading table-heading">
           <div>
             <p className="eyebrow">Detailed breakdown</p>
             <h2 id="release-table-title">Tracked releases</h2>
+            <ScopeChip label={scopeLabel} />
           </div>
-          <span className="asset-pill"><Package size={13} /> {displayAssetName(project)}</span>
+          <div className="table-actions">
+            <span className="asset-pill"><Package size={13} /> {displayAssetName(project)}</span>
+            <button className="ghost-button" disabled={!tableReleases.length} onClick={exportCsv} type="button"><FileDown size={13} aria-hidden="true" /> Export CSV</button>
+          </div>
         </div>
         <div className="table-scroll">
           <table>
-            {hasAssetBreakdown && secondaryAsset ? <>
-              <thead>
-                <tr><th>Version</th><th>Published</th><th className="align-right">{primaryAsset.label} downloads</th><th className="align-right">{secondaryAsset.label} downloads</th><th>Share</th><th className="align-right">Release downloads</th><th><span className="sr-only">Open</span></th></tr>
-              </thead>
-              <tbody>
-                {!summary && <tr className="empty-row"><td colSpan={7}>{emptyNote}</td></tr>}
-                {releases.map((release, index) => {
-                  const share = summary?.total ? Math.round((release.downloads / summary.total) * 100) : 0;
-                  return (
-                    <tr key={release.version}>
-                      <td><span className="release-version">{release.version}</span>{index === 0 && <span className="latest-tag">Latest</span>}</td>
-                      <td><span className="date-cell"><CalendarDays size={14} /> {formatDate(release.publishedAt)}</span></td>
-                      <td className="align-right"><strong className="download-count">{formatNumber(release.assets?.[primaryAsset.id]?.downloads ?? 0)}</strong></td>
-                      <td className="align-right"><strong className="download-count">{formatNumber(release.assets?.[secondaryAsset.id]?.downloads ?? 0)}</strong></td>
-                      <td><span className="share-cell"><i><b style={{ width: `${share}%` }} /></i>{share}%</span></td>
-                      <td className="align-right"><strong className="download-count">{formatNumber(release.downloads)}</strong></td>
-                      <td><a className="row-link" href={release.url} target="_blank" rel="noreferrer" aria-label={`Open ${release.version} release`}><ExternalLink size={14} /></a></td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </> : <>
-              <thead>
-                <tr><th>Version</th><th>Published</th><th>Asset size</th><th>Share</th><th className="align-right">Release downloads</th><th><span className="sr-only">Open</span></th></tr>
-              </thead>
-              <tbody>
-                {!summary && <tr className="empty-row"><td colSpan={6}>{emptyNote}</td></tr>}
-                {releases.map((release, index) => {
-                  const share = summary?.total ? Math.round((release.downloads / summary.total) * 100) : 0;
-                  return (
-                    <tr key={release.version}>
-                      <td><span className="release-version">{release.version}</span>{index === 0 && <span className="latest-tag">Latest</span>}</td>
-                      <td><span className="date-cell"><CalendarDays size={14} /> {formatDate(release.publishedAt)}</span></td>
-                      <td>{Math.round(release.size / 1024)} KB</td>
-                      <td><span className="share-cell"><i><b style={{ width: `${share}%` }} /></i>{share}%</span></td>
-                      <td className="align-right"><strong className="download-count">{formatNumber(release.downloads)}</strong></td>
-                      <td><a className="row-link" href={release.url} target="_blank" rel="noreferrer" aria-label={`Open ${release.version} release`}><ExternalLink size={14} /></a></td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </>}
+            <thead>
+              <tr>
+                <th>Version</th>
+                <th aria-sort={ariaSort('published')}><button className="sort-button" onClick={() => toggleSort('published')} type="button">Published {sortIcon('published')}</button></th>
+                {hasAssetBreakdown && secondaryAsset
+                  ? <>
+                      <th className="align-right">{primaryAsset.label}</th>
+                      <th className="align-right">{secondaryAsset.label}</th>
+                    </>
+                  : <th>Asset size</th>}
+                <th>Share</th>
+                <th className="align-right" aria-sort={ariaSort('rate')}><button className="sort-button" onClick={() => toggleSort('rate')} type="button">Per day {sortIcon('rate')}</button></th>
+                <th className="align-right" aria-sort={ariaSort('downloads')}><button className="sort-button" onClick={() => toggleSort('downloads')} type="button">Downloads {sortIcon('downloads')}</button></th>
+                <th><span className="sr-only">Open</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              {!summary && <tr className="empty-row"><td colSpan={hasAssetBreakdown ? 8 : 7}>{emptyNote}</td></tr>}
+              {tableReleases.map((release) => {
+                const share = scopedTotal ? (release.downloads / scopedTotal) * 100 : 0;
+                return (
+                  <tr key={release.version} className={release.prerelease ? 'is-prerelease' : ''}>
+                    <td>
+                      <span className="release-version">{release.version}</span>
+                      {release.version === summary?.latest.version && <span className="latest-tag">Latest</span>}
+                      {release.prerelease && <span className="prerelease-tag">Pre-release</span>}
+                    </td>
+                    <td><span className="date-cell" title={formatDate(release.publishedAt)}><CalendarDays size={14} /> {formatShortDate(release.publishedAt)}<small>{formatAge(release.publishedAt)}</small></span></td>
+                    {hasAssetBreakdown && secondaryAsset
+                      ? <>
+                          <td className="align-right"><strong className="download-count">{formatNumber(release.assets?.[primaryAsset.id]?.downloads ?? 0)}</strong></td>
+                          <td className="align-right"><strong className="download-count">{formatNumber(release.assets?.[secondaryAsset.id]?.downloads ?? 0)}</strong></td>
+                        </>
+                      : <td>{Math.round(release.size / 1024)} KB</td>}
+                    <td><span className="share-cell"><i><b style={{ width: `${share}%` }} /></i>{Math.round(share)}%</span></td>
+                    <td className="align-right"><span className="rate-cell">{formatRate(downloadsPerDay(release))}</span></td>
+                    <td className="align-right"><strong className="download-count">{formatNumber(release.downloads)}</strong></td>
+                    <td><a className="row-link" href={release.url} target="_blank" rel="noreferrer" aria-label={`Open ${release.version} release`}><ExternalLink size={14} /></a></td>
+                  </tr>
+                );
+              })}
+            </tbody>
           </table>
         </div>
+        {releaseWindow === 'recent' && releases.length > RECENT_RELEASE_COUNT && (
+          <div className="table-footer">
+            <span>{releases.length - scopedReleases.length} older {channelLabel} hidden by the Compare filter</span>
+            <button className="ghost-button" onClick={() => setReleaseWindow('all')} type="button">Show all {releases.length}</button>
+          </div>
+        )}
       </section>
 
       <section className="method-card">

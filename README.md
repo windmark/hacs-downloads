@@ -18,6 +18,10 @@ HACS Download Analytics turns the download counters exposed by GitHub Releases i
 - Track integration `.zip` archives, frontend card `.js` bundles, firmware images, or other release assets with fixed or version-derived filenames.
 - Configure a labeled pair of assets when a project needs separate download counts, such as Factory and OTA firmware images.
 - Review combined totals, asset-level summaries, download share, and individual releases without switching dashboard views.
+- Filter every view from one sticky filter bar: stable releases only (the default) or with pre-releases, and the last 5 or all releases for the chart, share and table. Hovering a filter highlights the sections it changes, and filters are kept in the URL.
+- Pre-releases are detected from GitHub's flag and from common tag patterns such as `-beta.3`, `rc1` or `b5`.
+- Compare releases fairly with downloads per day since release, see a multi-version share donut, and track how much of the past week's downloads went to the latest release.
+- Sort the release table, export the current view as CSV, and see when the latest release is projected to pass the previous record at its current pace.
 - See each selected repository's GitHub star count beside its repository link.
 - Compare 24-hour and 7-day growth for totals, latest releases, leading releases, and active-release averages.
 - Explore daily and weekly download velocity as snapshot history accumulates, with stacked asset sections for multi-asset projects.
