@@ -32,7 +32,9 @@ import {
   Wrench,
 } from 'lucide-react';
 import { Fragment, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react';
+import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent, ReactNode } from 'react';
+import { useTooltip } from './Tooltip';
+import type { TipRow } from './Tooltip';
 import projectConfigs from './projects.json';
 import { formatGitHubStarCount, parseGitHubStarCount } from './github';
 import { buildReleaseComparison, filterPrereleases, formatReleaseAge } from './releaseComparison';
@@ -194,6 +196,26 @@ const OLDER_COLOR = '#d3dbe1';
 const PRERELEASE_COLOR = '#c9a5ea';
 const SHARE_TRACK_COLOR = '#eef2f5';
 const SHARE_GAP_DEG = 1.2;
+const PRIMARY_ASSET_COLOR = '#3dbfa5';
+const SECONDARY_ASSET_COLOR = '#8ea6ef';
+const RECORD_COLOR = '#9aa8b5';
+
+/** Index of the donut segment under the pointer, or -1 outside the ring. */
+function segmentAtPointer(event: ReactMouseEvent<HTMLElement>, shares: readonly number[]) {
+  const rect = event.currentTarget.getBoundingClientRect();
+  const dx = event.clientX - (rect.left + rect.width / 2);
+  const dy = event.clientY - (rect.top + rect.height / 2);
+  const radius = Math.hypot(dx, dy);
+  const outer = rect.width / 2;
+  if (radius > outer || radius < outer * 0.72) return -1;
+  const angle = ((Math.atan2(dx, -dy) * 180) / Math.PI + 360) % 360;
+  let start = 0;
+  for (let index = 0; index < shares.length; index += 1) {
+    start += shares[index] * 3.6;
+    if (angle < start) return index;
+  }
+  return -1;
+}
 
 /** Strips the shared version prefix (e.g. `v0.7.`) so narrow screens can show `.30`. */
 function shortVersionLabels(versions: readonly string[]) {
@@ -650,6 +672,8 @@ function ProjectSelector({ project, onSelect }: { project: ProjectConfig; onSele
 }
 
 export default function Home() {
+  const { bind: tip, showAt: showTipAt, hide: hideTip } = useTooltip();
+  const [hoveredShare, setHoveredShare] = useState<number | null>(null);
   const [projectId, setProjectId] = useState(getInitialProjectId);
   const project = useMemo(() => getProject(projectId), [projectId]);
   const [initialSnapshot] = useState(() => readCachedSnapshot(projectId));
@@ -1211,6 +1235,19 @@ export default function Home() {
   const versionColorMap = new Map(coloredVersions.map((version, index) => [version, VERSION_COLORS[index % VERSION_COLORS.length]]));
   const versionColor = (version: string) => (prereleaseVersions.has(version) ? PRERELEASE_COLOR : versionColorMap.get(version) ?? OLDER_COLOR);
   const shareColors = shareSegments.map((segment) => (segment.isOther ? OLDER_COLOR : versionColor(segment.id)));
+  const shareTip = (index: number) => {
+    const segment = shareSegments[index];
+    const release = segment.isOther ? undefined : scopedReleases.find((entry) => entry.version === segment.id);
+    return {
+      title: segment.label,
+      subtitle: release ? `${formatShortDate(release.publishedAt)} · ${formatAge(release.publishedAt)}` : 'Smaller releases grouped together',
+      rows: [
+        { label: 'Downloads', value: formatNumber(segment.downloads), color: shareColors[index], strong: true },
+        { label: 'Share of view', value: `${Math.round(segment.share)}%` },
+        ...(release ? [{ label: 'Per day', value: formatRate(downloadsPerDay(release)) }] : []),
+      ],
+    };
+  };
   const mixCategories = [
     ...[...mixLeaders]
       .sort(newestFirst)
@@ -1250,6 +1287,17 @@ export default function Home() {
   const scopedPrimaryDownloads = scopedAssetTotals[primaryAsset.id] ?? 0;
   const scopedSecondaryDownloads = secondaryAsset ? scopedAssetTotals[secondaryAsset.id] ?? 0 : 0;
   const primaryAssetShare = scopedTotal ? Math.round((scopedPrimaryDownloads / scopedTotal) * 100) : 0;
+  const assetTip = (index: number) => {
+    const asset = index === 0 ? primaryAsset : secondaryAsset;
+    const downloads = index === 0 ? scopedPrimaryDownloads : scopedSecondaryDownloads;
+    return {
+      title: `${asset?.label ?? 'Asset'} downloads`,
+      rows: [
+        { label: 'Downloads', value: formatNumber(downloads), color: index === 0 ? PRIMARY_ASSET_COLOR : SECONDARY_ASSET_COLOR, strong: true },
+        { label: 'Share of view', value: `${scopedTotal ? Math.round((downloads / scopedTotal) * 100) : 0}%` },
+      ],
+    };
+  };
 
   const toggleSort = (key: SortKey) => setSort((current) => (
     current.key === key ? { key, direction: current.direction === 'desc' ? 'asc' : 'desc' } : { key, direction: 'desc' }
@@ -1432,7 +1480,7 @@ export default function Home() {
         <div className="growth-layout">
           <div
             className={`velocity-chart${(velocityView === 'versions' ? includedMix.length : growthSeries.length) > 10 ? ' is-dense' : ''}`}
-            role="img"
+            role="group"
             aria-label={`${growthRange === 'daily' ? 'Daily' : 'Weekly'} new ${hasAssetBreakdown ? 'tracked downloads' : 'downloads'} for ${project.name}`}
           >
             {velocityView !== 'versions' && growthSeries.length > 1 && growthAverage !== null && growthAverage > 0 && (
@@ -1456,10 +1504,29 @@ export default function Home() {
                   }));
                   const released = releasesBetween(index > 0 ? includedMix[index - 1].t : day.t - INSIGHT_DAY_MS, day.t);
                   return (
-                    <div className={`velocity-column${index === includedMix.length - 1 ? ' is-last' : ''}`} key={day.t} title={`${day.label}: ${segments.filter((segment) => segment.value).map((segment) => `${segment.label} ${segment.value}`).join(', ') || 'no downloads'}${released.length ? `. Released ${released.join(', ')}` : ''}`}>
+                    <div
+                      className={`velocity-column${index === includedMix.length - 1 ? ' is-last' : ''}`}
+                      key={day.t}
+                      tabIndex={0}
+                      aria-label={`${day.label}: ${segments.filter((segment) => segment.value).map((segment) => `${segment.label} ${segment.value}`).join(', ') || 'no downloads'}${released.length ? `. Released ${released.join(', ')}` : ''}`}
+                      {...tip(() => ({
+                        title: day.label,
+                        subtitle: released.length ? `Released ${released.join(', ')}` : undefined,
+                        rows: [
+                          ...segments.filter((segment) => segment.value > 0).map((segment): TipRow => ({
+                            label: segment.label,
+                            value: `${formatNumber(segment.value)} · ${Math.round((segment.value / Math.max(day.total, 1)) * 100)}%`,
+                            color: segment.color,
+                            striped: segment.striped,
+                          })),
+                          { label: 'Total', value: `+${formatNumber(day.total)}`, strong: true },
+                        ],
+                        note: day.total ? undefined : 'No downloads this day',
+                      }))}
+                    >
                       <span className="velocity-value">{released.length > 0 && <i className="release-dot" aria-label={`Released ${released.join(', ')}`} />}<span className="velocity-number">{day.total ? `+${formatNumber(day.total)}` : '0'}</span></span>
                       <span className="velocity-track">
-                        <span className="velocity-stack" style={{ height: `${Math.max((day.total / maxMix) * 100, day.total ? 5 : 0)}%` }}>
+                        <span className="velocity-stack" data-tip-anchor style={{ height: `${Math.max((day.total / maxMix) * 100, day.total ? 5 : 0)}%` }}>
                           {[...segments].reverse().filter((segment) => segment.value > 0).map((segment) => (
                             <i className={`bar-segment${segment.striped ? ' is-striped' : ''}`} key={segment.id} style={{ flexGrow: segment.value, ...(segment.striped ? {} : { background: segment.color }) }} />
                           ))}
@@ -1486,17 +1553,30 @@ export default function Home() {
                 <div
                   className={`velocity-column${growthPeak?.capturedAt === point.capturedAt ? ' is-peak' : ''}${isSpike ? ' is-spike' : ''}${index === growthSeries.length - 1 ? ' is-last' : ''}`}
                   key={point.capturedAt}
-                  title={`${point.label}: ${formatSignedNumber(point.value)} downloads${isSpike ? ' (unusually high)' : ''}${released.length ? `. Released ${released.join(', ')}` : ''}`}
+                  tabIndex={0}
+                  {...tip(() => ({
+                    title: growthRange === 'daily' ? point.label : `7 days to ${point.label}`,
+                    subtitle: released.length ? `Released ${released.join(', ')}` : undefined,
+                    rows: [
+                      ...(showAssetStack && secondaryAsset ? [
+                        { label: primaryAsset.label, value: formatSignedNumber(primaryDownloads), color: PRIMARY_ASSET_COLOR },
+                        { label: secondaryAsset.label, value: formatSignedNumber(secondaryDownloads), color: SECONDARY_ASSET_COLOR },
+                      ] : []),
+                      { label: 'New downloads', value: formatSignedNumber(point.value), strong: true },
+                      ...(growthAverage ? [{ label: 'Vs average', value: formatGrowthPercentage(((point.value - growthAverage) / Math.abs(growthAverage)) * 100) }] : []),
+                    ],
+                    note: isSpike ? 'Unusually high for this project' : growthPeak?.capturedAt === point.capturedAt ? `Peak ${growthRange === 'daily' ? 'day' : 'week'} in this range` : undefined,
+                  }))}
                   aria-label={`${point.label}: ${point.value} new ${hasAssetBreakdown ? `tracked downloads, ${primaryDownloads} ${primaryAsset.label}, ${secondaryDownloads} ${secondaryAsset?.label}` : 'downloads'}${isSpike ? ', unusually high' : ''}${released.length ? `, released ${released.join(', ')}` : ''}`}
                 >
                   <span className="velocity-value">{released.length > 0 && <i className="release-dot" aria-hidden="true" />}<span className="velocity-number">{formatSignedNumber(point.value)}</span>{isSpike && <b className="spike-flag">Spike</b>}</span>
                   <span className="velocity-track">
                     {showAssetStack
-                      ? <span className="velocity-stack" style={{ height: `${Math.max((Math.abs(point.value) / maxGrowth) * 100, point.value ? 5 : 0)}%` }}>
+                      ? <span className="velocity-stack" data-tip-anchor style={{ height: `${Math.max((Math.abs(point.value) / maxGrowth) * 100, point.value ? 5 : 0)}%` }}>
                           {secondaryDownloads > 0 && <i className="bar-segment asset-secondary" style={{ flexGrow: secondaryDownloads }} />}
                           {primaryDownloads > 0 && <i className="bar-segment asset-primary" style={{ flexGrow: primaryDownloads }} />}
                         </span>
-                      : <i className="velocity-fill" style={{ height: `${Math.max((Math.abs(point.value) / maxGrowth) * 100, point.value ? 5 : 0)}%` }} />}
+                      : <i className="velocity-fill" data-tip-anchor style={{ height: `${Math.max((Math.abs(point.value) / maxGrowth) * 100, point.value ? 5 : 0)}%` }} />}
                   </span>
                   <span className="velocity-label">{index % 2 === 0 || index === growthSeries.length - 1 ? point.label : ''}</span>
                 </div>
@@ -1551,7 +1631,20 @@ export default function Home() {
                     : `${releaseComparison.progressPercentage}% of previous record`}</strong>
                 <span>{releaseComparison.latest.version} · {formatReleaseAge(releaseComparison.ageDays)}</span>
               </div>
-              <div className="benchmark-progress">
+              <div
+                className="benchmark-progress"
+                tabIndex={0}
+                {...tip(() => ({
+                  title: 'Latest vs previous record',
+                  rows: [
+                    { label: releaseComparison.latest.version, value: formatNumber(releaseComparison.latest.downloads), color: PRIMARY_ASSET_COLOR, strong: true },
+                    { label: `${releaseComparison.previousBest.version} (record)`, value: formatNumber(releaseComparison.previousBest.downloads), color: RECORD_COLOR },
+                    { label: releaseComparison.difference >= 0 ? 'Ahead by' : 'To go', value: formatNumber(Math.abs(releaseComparison.difference)) },
+                    ...(recordEta && releaseComparison.difference < 0 ? [{ label: 'At current pace', value: `≈${recordEta} ${recordEta === 1 ? 'day' : 'days'}` }] : []),
+                  ],
+                  note: formatReleaseAge(releaseComparison.ageDays),
+                }))}
+              >
                 <div className="benchmark-track" aria-hidden="true">
                   <i style={{ width: `${Math.min(releaseComparison.progressPercentage, 100)}%` }} />
                   {benchmarkRecordPosition !== null && (
@@ -1572,7 +1665,7 @@ export default function Home() {
             aria-label="Scrollable release download chart"
             role="region"
           >
-            <div className="bar-chart" role="img" aria-label={`Bar chart showing ${project.name} release asset downloads by version`}>
+            <div className="bar-chart" role="group" aria-label={`Bar chart showing ${project.name} release asset downloads by version`}>
               <span className="grid-line grid-line-100" aria-hidden="true" />
               <span className="grid-line grid-line-50" aria-hidden="true" />
               {releaseComparison && benchmarkLineTop !== null && (
@@ -1585,15 +1678,28 @@ export default function Home() {
                 const primaryDownloads = release.assets?.[primaryAsset.id]?.downloads ?? 0;
                 const secondaryDownloads = secondaryAsset ? release.assets?.[secondaryAsset.id]?.downloads ?? 0 : 0;
                 return (
-                <a className={`bar-column${isLatest ? ' is-latest' : ''}${release.prerelease ? ' is-prerelease' : ''}`} href={release.url} target="_blank" rel="noreferrer" key={release.version} title={`${release.version}${release.prerelease ? ' (pre-release)' : ''}: ${formatNumber(release.downloads)} downloads, ${formatRate(downloadsPerDay(release))} per day`} aria-label={`${release.version}${release.prerelease ? ' pre-release' : ''}: ${release.downloads} downloads, ${formatRate(downloadsPerDay(release))} per day${hasAssetBreakdown && secondaryAsset ? `, ${primaryDownloads} ${primaryAsset.label}, ${secondaryDownloads} ${secondaryAsset.label}` : ''}${isLatest && releaseComparison ? `, ${formatReleaseAge(releaseComparison.ageDays).toLowerCase()}` : ''}`}>
+                <a className={`bar-column${isLatest ? ' is-latest' : ''}${release.prerelease ? ' is-prerelease' : ''}`} href={release.url} target="_blank" rel="noreferrer" key={release.version} {...tip(() => ({
+                  title: <>{release.version}{isLatest && <b className="latest-tag">Latest</b>}{release.prerelease && <b className="chart-tip-tag">Pre-release</b>}</>,
+                  subtitle: `${formatShortDate(release.publishedAt)} · ${formatAge(release.publishedAt)}`,
+                  rows: [
+                    ...(hasAssetBreakdown && secondaryAsset ? [
+                      { label: primaryAsset.label, value: formatNumber(primaryDownloads), color: PRIMARY_ASSET_COLOR },
+                      { label: secondaryAsset.label, value: formatNumber(secondaryDownloads), color: SECONDARY_ASSET_COLOR },
+                    ] : []),
+                    { label: 'Downloads', value: formatNumber(release.downloads), strong: chartMetric === 'total' },
+                    { label: 'Per day', value: formatRate(downloadsPerDay(release)), strong: chartMetric === 'rate' },
+                    { label: 'Share of view', value: `${scopedTotal ? Math.round((release.downloads / scopedTotal) * 100) : 0}%` },
+                  ],
+                  note: 'Select to open on GitHub',
+                }))} aria-label={`${release.version}${release.prerelease ? ' pre-release' : ''}: ${release.downloads} downloads, ${formatRate(downloadsPerDay(release))} per day${hasAssetBreakdown && secondaryAsset ? `, ${primaryDownloads} ${primaryAsset.label}, ${secondaryDownloads} ${secondaryAsset.label}` : ''}${isLatest && releaseComparison ? `, ${formatReleaseAge(releaseComparison.ageDays).toLowerCase()}` : ''}`}>
                   <span className="bar-value">{value ? (chartMetric === 'rate' ? formatRate(value) : formatNumber(value)) : '–'}</span>
                   <div className="bar-track">
                     {hasAssetBreakdown && secondaryAsset
-                      ? <span className="bar-stack" style={{ height: `${Math.max((value / maxDownloads) * 100, value ? 7 : 0)}%` }}>
+                      ? <span className="bar-stack" data-tip-anchor style={{ height: `${Math.max((value / maxDownloads) * 100, value ? 7 : 0)}%` }}>
                           {secondaryDownloads > 0 && <i className="bar-segment asset-secondary" style={{ flexGrow: secondaryDownloads }} />}
                           {primaryDownloads > 0 && <i className="bar-segment asset-primary" style={{ flexGrow: primaryDownloads }} />}
                         </span>
-                      : <span className="bar-fill" style={{ height: `${Math.max((value / maxDownloads) * 100, value ? 7 : 0)}%` }} />}
+                      : <span className="bar-fill" data-tip-anchor style={{ height: `${Math.max((value / maxDownloads) * 100, value ? 7 : 0)}%` }} />}
                   </div>
                   <span className={`bar-label${isLatest ? ' is-latest' : ''}`}><span className="bar-label-full">{release.version}</span><span className="bar-label-short" aria-hidden="true">{shortBarLabels.get(release.version) ?? release.version}</span></span>
                 </a>
@@ -1620,15 +1726,24 @@ export default function Home() {
           </div>
           {summary && hasAssetBreakdown && secondaryAsset ? <>
             <div className="donut-wrap">
-              <div className="donut" style={{ '--share': `${primaryAssetShare * 3.6}deg` } as CSSProperties}>
+              <div
+                className="donut is-interactive"
+                style={{ '--share': `${primaryAssetShare * 3.6}deg` } as CSSProperties}
+                onMouseMove={(event) => {
+                  const index = segmentAtPointer(event, [primaryAssetShare, 100 - primaryAssetShare]);
+                  if (index >= 0) showTipAt(event.clientX, event.clientY, assetTip(index));
+                  else hideTip();
+                }}
+                onMouseLeave={hideTip}
+              >
                 <div><strong>{primaryAssetShare}%</strong><span>{primaryAsset.label.toLowerCase()}s</span></div>
               </div>
             </div>
-            <div className="leader-row">
+            <div className="leader-row" tabIndex={0} {...tip(() => assetTip(0))}>
               <span><i /> {primaryAsset.label}s</span>
               <strong>{formatNumber(scopedPrimaryDownloads)}</strong>
             </div>
-            <div className="leader-row secondary">
+            <div className="leader-row secondary" tabIndex={0} {...tip(() => assetTip(1))}>
               <span><i /> {secondaryAsset.label}s</span>
               <strong>{formatNumber(scopedSecondaryDownloads)}</strong>
             </div>
@@ -1638,13 +1753,28 @@ export default function Home() {
             </div>
           </> : summary && shareSegments.length ? <>
             <div className="donut-wrap">
-              <div className="donut" style={{ background: conicGradient(shareSegments, shareColors, SHARE_TRACK_COLOR, SHARE_GAP_DEG) }}>
+              <div
+                className="donut is-interactive"
+                style={{ background: conicGradient(shareSegments, shareColors, SHARE_TRACK_COLOR, SHARE_GAP_DEG) }}
+                onMouseMove={(event) => {
+                  const index = segmentAtPointer(event, shareSegments.map((segment) => segment.share));
+                  setHoveredShare(index >= 0 ? index : null);
+                  if (index >= 0) showTipAt(event.clientX, event.clientY, shareTip(index));
+                  else hideTip();
+                }}
+                onMouseLeave={() => { setHoveredShare(null); hideTip(); }}
+              >
                 <div><strong>{Math.round(shareSegments[0].share)}%</strong><span>{shareSegments[0].label}</span></div>
               </div>
             </div>
             <ul className="share-legend">
               {shareSegments.map((segment, index) => (
-                <li key={segment.id} className={segment.id === summary.latest.version ? 'is-latest' : ''}>
+                <li
+                  key={segment.id}
+                  className={`${segment.id === summary.latest.version ? 'is-latest' : ''}${hoveredShare === index ? ' is-hovered' : ''}`}
+                  tabIndex={0}
+                  {...tip(() => shareTip(index))}
+                >
                   <span><i style={{ background: shareColors[index] }} />{segment.label}{segment.id === summary.latest.version && <b className="latest-tag">Latest</b>}</span>
                   <strong>{formatNumber(segment.downloads)}</strong>
                   <small>{Math.round(segment.share)}%</small>
@@ -1723,7 +1853,7 @@ export default function Home() {
           </div>
           {starSeries.length >= 2
             ? <>
-                <LineChart label={`Cumulative GitHub stars for ${project.name}`} height={130} series={[{ id: 'stars', points: starSeries, color: '#3dbfa5', area: true }]} showEnd />
+                <LineChart label={`Cumulative GitHub stars for ${project.name}`} height={130} series={[{ id: 'stars', points: starSeries, color: '#3dbfa5', area: true }]} showEnd valueLabel="Stars" />
                 <div className="detail-axis"><span>{formatShortDate(new Date(starSeries[0].t).toISOString())}</span><span>Today</span></div>
               </>
             : <div className="insight-placeholder">Star history appears after the next daily capture.</div>}
@@ -1836,7 +1966,14 @@ export default function Home() {
                           <td className="align-right"><strong className="download-count">{formatNumber(release.assets?.[secondaryAsset.id]?.downloads ?? 0)}</strong></td>
                         </>
                       : <td>{Math.round(release.size / 1024)} KB</td>}
-                    <td><span className="share-cell"><i><b style={{ width: `${share}%` }} /></i>{Math.round(share)}%</span></td>
+                    <td><span className="share-cell" {...tip({
+                      title: release.version,
+                      rows: [
+                        { label: 'Downloads', value: formatNumber(release.downloads), strong: true },
+                        { label: 'Share of view', value: `${share < 1 && share > 0 ? share.toFixed(1) : Math.round(share)}%` },
+                        { label: 'Downloads in view', value: formatNumber(scopedTotal) },
+                      ],
+                    })}><i><b style={{ width: `${share}%` }} /></i>{Math.round(share)}%</span></td>
                     <td className="align-right"><span className="rate-cell">{formatRate(downloadsPerDay(release))}</span></td>
                     <td className="align-right"><strong className="download-count">{formatNumber(release.downloads)}</strong></td>
                     <td><a className="row-link" href={release.url} target="_blank" rel="noreferrer" aria-label={`Open ${release.version} release`}><ExternalLink size={14} /></a></td>

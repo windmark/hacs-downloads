@@ -1,10 +1,13 @@
 import { Bug, ExternalLink, Heart, Wrench } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { useState } from 'react';
+import type { MouseEvent, ReactNode } from 'react';
+import { useTooltip } from './Tooltip';
 import { DAY_MS, LAUNCH_BUCKETS } from './insights';
 import type { LaunchCurve, Point } from './insights';
 import type { MetaIssue } from './meta';
 
 const number = (value: number) => new Intl.NumberFormat('en').format(Math.round(value));
+const tipDate = (t: number) => new Intl.DateTimeFormat('en', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(t));
 
 export function formatDuration(hours: number | null) {
   if (hours === null) return '—';
@@ -26,6 +29,7 @@ export function LineChart({
   label,
   independentScales = false,
   showEnd = false,
+  valueLabel = 'Downloads',
 }: {
   series: Array<{ id: string; points: Point[]; color: string; dashed?: boolean; area?: boolean }>;
   height?: number;
@@ -33,7 +37,11 @@ export function LineChart({
   independentScales?: boolean;
   /** Marks the last point of the first series with a dot and its value. */
   showEnd?: boolean;
+  /** Row label in the hover tooltip for single-series charts. */
+  valueLabel?: string;
 }) {
+  const { showAt, hide } = useTooltip();
+  const [hoverT, setHoverT] = useState<number | null>(null);
   const width = 600;
   const all = series.flatMap((entry) => entry.points);
   if (all.length < 2) return null;
@@ -48,8 +56,27 @@ export function LineChart({
   const endSeries = showEnd ? series[0] : undefined;
   const endPoint = endSeries?.points.at(-1);
   const endY = endSeries && endPoint ? scaleFor(endSeries)(endPoint.v) : null;
+  const nearest = (points: Point[], t: number) => points.reduce((best, point) => (Math.abs(point.t - t) < Math.abs(best.t - t) ? point : best), points[0]);
+  const onMove = (event: MouseEvent<HTMLDivElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const fraction = Math.min(Math.max((event.clientX - rect.left) / rect.width, 0), 1);
+    const lead = series[0];
+    const point = nearest(lead.points, minT + fraction * (maxT - minT));
+    setHoverT(point.t);
+    const y = (scaleFor(lead)(point.v) / height) * rect.height;
+    showAt(rect.left + (x(point.t) / width) * rect.width, rect.top + y, {
+      title: tipDate(point.t),
+      rows: series.map((entry) => ({
+        label: series.length > 1 ? entry.id : valueLabel,
+        value: number(nearest(entry.points, point.t).v),
+        color: entry.color,
+      })),
+    });
+  };
+  const onLeave = () => { setHoverT(null); hide(); };
+  const hoverPoint = hoverT !== null ? nearest(series[0].points, hoverT) : null;
   return (
-    <div className="line-chart-wrap">
+    <div className="line-chart-wrap" onMouseMove={onMove} onMouseLeave={onLeave}>
       <svg className="line-chart" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" role="img" aria-label={label}>
         <line x1="0" x2={width} y1={height - 1} y2={height - 1} className="line-chart-axis" />
         <line x1="0" x2={width} y1={height / 2} y2={height / 2} className="line-chart-grid" />
@@ -68,6 +95,11 @@ export function LineChart({
           );
         })}
       </svg>
+      {hoverPoint && (
+        <span className="line-chart-hover" style={{ left: `${(x(hoverPoint.t) / width) * 100}%` }} aria-hidden="true">
+          <i style={{ background: series[0].color, top: `${(scaleFor(series[0])(hoverPoint.v) / height) * 100}%` }} />
+        </span>
+      )}
       {endSeries && endPoint && endY !== null && (
         <span className="line-chart-end" style={{ left: `${(x(endPoint.t) / width) * 100}%`, top: `${(endY / height) * 100}%` }} aria-hidden="true">
           <i style={{ background: endSeries.color }} />
@@ -89,6 +121,7 @@ export type LaunchRow = {
 };
 
 export function LaunchHeatmap({ rows }: { rows: LaunchRow[] }) {
+  const { bind } = useTooltip();
   const max = Math.max(1, ...rows.flatMap((row) => row.curve.buckets.map((bucket) => bucket.downloads ?? 0)));
   const tracked = rows.filter((row) => row.curve.available);
   return (
@@ -117,7 +150,18 @@ export function LaunchHeatmap({ rows }: { rows: LaunchRow[] }) {
                     className={`heat-cell${bucket.partial ? ' is-partial' : ''}${bucket.downloads === null ? ' is-empty' : ''}${intensity > 0.55 ? ' is-strong' : ''}`}
                     key={bucket.id}
                     style={bucket.downloads ? { background: `rgb(61 191 165 / ${(0.1 + intensity * 0.7).toFixed(2)})` } : undefined}
-                    title={bucket.partial ? `${bucket.label}: ${bucket.downloads} so far` : undefined}
+                    {...(bucket.downloads === null ? {} : bind(() => {
+                      const launchTotal = row.curve.buckets.reduce((sum, entry) => sum + (entry.downloads ?? 0), 0);
+                      return {
+                        title: `${row.version} · ${bucket.label}`,
+                        subtitle: bucket.partial ? 'Still counting' : undefined,
+                        rows: [
+                          { label: bucket.partial ? 'Downloads so far' : 'Downloads', value: number(bucket.downloads ?? 0), strong: true },
+                          { label: 'Of tracked launch', value: launchTotal ? `${Math.round(((bucket.downloads ?? 0) / launchTotal) * 100)}%` : '—' },
+                          { label: 'Vs busiest cell', value: `${Math.round(intensity * 100)}%` },
+                        ],
+                      };
+                    }))}
                   >
                     {bucket.downloads === null ? '' : number(bucket.downloads)}
                   </td>
@@ -213,6 +257,8 @@ export function PortfolioTable({ rows, onSelect }: {
   onSelect: (id: string) => void;
 }) {
   const max = Math.max(1, ...rows.map((row) => row.total));
+  const sum = rows.reduce((total, row) => total + row.total, 0);
+  const { bind } = useTooltip();
   return (
     <div className="table-scroll">
       <table className="portfolio-table">
@@ -224,7 +270,14 @@ export function PortfolioTable({ rows, onSelect }: {
             <tr className={row.selected ? 'is-selected' : ''} key={row.id}>
               <td>
                 <button className="portfolio-name" onClick={() => onSelect(row.id)} type="button">{row.name}</button>
-                <span className="share-cell"><i><b style={{ width: `${(row.total / max) * 100}%` }} /></i></span>
+                <span className="share-cell" {...bind({
+                  title: row.name,
+                  rows: [
+                    { label: 'Downloads', value: number(row.total), strong: true },
+                    { label: 'Of all projects', value: sum ? `${Math.round((row.total / sum) * 100)}%` : '—' },
+                    ...(row.week !== null ? [{ label: 'Last 7 days', value: `+${number(row.week)}` }] : []),
+                  ],
+                })}><i><b style={{ width: `${(row.total / max) * 100}%` }} /></i></span>
               </td>
               <td className="align-right"><strong className="download-count">{number(row.total)}</strong></td>
               <td className="align-right">{row.week === null ? '—' : `+${number(row.week)}`}</td>
