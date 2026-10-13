@@ -694,7 +694,8 @@ export default function Home() {
   const [velocityView, setVelocityView] = useState<'daily' | 'weekly' | 'versions'>('daily');
   const growthRange: 'daily' | 'weekly' = velocityView === 'weekly' ? 'weekly' : 'daily';
   const [meta, setMeta] = useState<ProjectMetaFile | null>(null);
-  const [expandedVersion, setExpandedVersion] = useState<string | null>(null);
+  // null until the visitor toggles a row; until then the latest release is expanded.
+  const [expandedChoice, setExpandedChoice] = useState<{ projectId: string; version: string | null } | null>(null);
   const [history, setHistory] = useState<DownloadHistory | null>(null);
   const [historyStatus, setHistoryStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const requestSequence = useRef(0);
@@ -1094,6 +1095,7 @@ export default function Home() {
     point.value > 0 && (!peak || point.value > peak.value) ? point : peak
   ), null);
 
+  const expandedVersion = expandedChoice?.projectId === project.id ? expandedChoice.version : summary?.latest.version ?? null;
   const chartReleases = useMemo(() => [...scopedReleases].reverse(), [scopedReleases]);
   const latestChartVersion = chartReleases.at(-1)?.version;
   const shortBarLabels = useMemo(() => shortVersionLabels(chartReleases.map((release) => release.version)), [chartReleases]);
@@ -1947,7 +1949,7 @@ export default function Home() {
                         aria-expanded={isExpanded}
                         aria-label={`${isExpanded ? 'Hide' : 'Show'} details for ${release.version}`}
                         className="expand-button"
-                        onClick={() => setExpandedVersion(isExpanded ? null : release.version)}
+                        onClick={() => setExpandedChoice({ projectId: project.id, version: isExpanded ? null : release.version })}
                         type="button"
                       >
                         <ChevronRight size={13} aria-hidden="true" />
