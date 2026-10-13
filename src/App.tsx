@@ -187,9 +187,24 @@ const DEFAULT_PROJECT_ID = PROJECTS[0].id;
 const LAST_PROJECT_KEY = 'hacs-downloads-selected-project-v1';
 const RATE_LIMIT_RESET_KEY = 'hacs-downloads-rate-limit-reset-v1';
 const FILTERS_KEY = 'hacs-downloads-filters-v1';
-const SHARE_COLORS = ['#19c6ad', '#0b8e81', '#7adccd', '#16526b', '#b4ece2'];
-const SHARE_OTHER_COLOR = '#cbd7df';
-const SHARE_TRACK_COLOR = '#e8eef2';
+// Pastel categorical palette, assigned by recency so a version keeps its colour across charts.
+// Index 0 (teal) always belongs to the newest coloured stable release.
+const VERSION_COLORS = ['#3dbfa5', '#8ea6ef', '#f3a77c', '#e3c45f', '#ef9bb5'];
+const OLDER_COLOR = '#d3dbe1';
+const PRERELEASE_COLOR = '#c9a5ea';
+const SHARE_TRACK_COLOR = '#eef2f5';
+const SHARE_GAP_DEG = 1.2;
+
+/** Strips the shared version prefix (e.g. `v0.7.`) so narrow screens can show `.30`. */
+function shortVersionLabels(versions: readonly string[]) {
+  if (versions.length < 2) return new Map(versions.map((version) => [version, version]));
+  let prefix = versions[0];
+  for (const version of versions) {
+    while (!version.startsWith(prefix)) prefix = prefix.slice(0, -1);
+  }
+  const cut = prefix.lastIndexOf('.');
+  return new Map(versions.map((version) => [version, cut > 0 && version.length > cut + 1 ? version.slice(cut) : version]));
+}
 
 type ScopeKind = 'channel' | 'window';
 type Filters = { releaseWindow: ReleaseWindow; includePrereleases: boolean };
@@ -972,7 +987,6 @@ export default function Home() {
     scopedReleases.reduce((sum, release) => sum + (release.assets?.[asset.id]?.downloads ?? 0), 0),
   ])), [scopedReleases, trackedAssets]);
   const shareSegments = useMemo(() => buildShareSegments(scopedReleases), [scopedReleases]);
-  const shareColors = shareSegments.map((segment, index) => segment.isOther ? SHARE_OTHER_COLOR : SHARE_COLORS[index % SHARE_COLORS.length]);
   const tableReleases = useMemo(() => sortReleases(scopedReleases, sort.key, sort.direction), [scopedReleases, sort]);
   const channelLabel = includePrereleases ? 'releases incl. pre-releases' : 'stable releases';
   const scopeLabel = releaseWindow === 'recent' && releases.length > RECENT_RELEASE_COUNT
@@ -1058,6 +1072,7 @@ export default function Home() {
 
   const chartReleases = useMemo(() => [...scopedReleases].reverse(), [scopedReleases]);
   const latestChartVersion = chartReleases.at(-1)?.version;
+  const shortBarLabels = useMemo(() => shortVersionLabels(chartReleases.map((release) => release.version)), [chartReleases]);
 
   const releaseComparison = useMemo(() => buildReleaseComparison(releases), [releases]);
 
@@ -1179,10 +1194,29 @@ export default function Home() {
   const mixLeaders = Object.entries(mixTotals)
     .filter(([version]) => !prereleaseVersions.has(version))
     .sort((a, b) => b[1] - a[1]).slice(0, 3).map(([version]) => version);
+  const publishedAtByVersion = new Map(allReleases.map((release) => [release.version, Date.parse(release.publishedAt)]));
+  const newestFirst = (a: string, b: string) => (publishedAtByVersion.get(b) ?? 0) - (publishedAtByVersion.get(a) ?? 0)
+    || b.localeCompare(a, undefined, { numeric: true });
+  const latestStableVersion = allReleases
+    .filter((release) => !release.prerelease)
+    .reduce<{ version: string; t: number } | null>((latest, release) => {
+      const t = Date.parse(release.publishedAt);
+      return !latest || t > latest.t ? { version: release.version, t } : latest;
+    }, null)?.version;
+  const coloredVersions = [...new Set([
+    ...(latestStableVersion ? [latestStableVersion] : []),
+    ...shareSegments.filter((segment) => !segment.isOther && !prereleaseVersions.has(segment.id)).map((segment) => segment.id),
+    ...mixLeaders,
+  ])].sort(newestFirst);
+  const versionColorMap = new Map(coloredVersions.map((version, index) => [version, VERSION_COLORS[index % VERSION_COLORS.length]]));
+  const versionColor = (version: string) => (prereleaseVersions.has(version) ? PRERELEASE_COLOR : versionColorMap.get(version) ?? OLDER_COLOR);
+  const shareColors = shareSegments.map((segment) => (segment.isOther ? OLDER_COLOR : versionColor(segment.id)));
   const mixCategories = [
-    ...mixLeaders.map((version, index) => ({ id: version, label: version, color: SHARE_COLORS[index], striped: false })),
-    { id: 'older', label: 'Older stable', color: SHARE_OTHER_COLOR, striped: false },
-    ...(includePrereleases ? [{ id: 'pre', label: 'Pre-releases', color: '#7adccd', striped: true }] : []),
+    ...[...mixLeaders]
+      .sort(newestFirst)
+      .map((version) => ({ id: version, label: version, color: versionColor(version), striped: false })),
+    { id: 'older', label: 'Older stable', color: OLDER_COLOR, striped: false },
+    ...(includePrereleases ? [{ id: 'pre', label: 'Pre-releases', color: PRERELEASE_COLOR, striped: true }] : []),
   ];
   const mixCategory = (version: string) => (prereleaseVersions.has(version) ? 'pre' : mixLeaders.includes(version) ? version : 'older');
   const maxMix = Math.max(1, ...includedMix.map((day) => day.total));
@@ -1397,10 +1431,17 @@ export default function Home() {
         </div>
         <div className="growth-layout">
           <div
-            className="velocity-chart"
+            className={`velocity-chart${(velocityView === 'versions' ? includedMix.length : growthSeries.length) > 10 ? ' is-dense' : ''}`}
             role="img"
             aria-label={`${growthRange === 'daily' ? 'Daily' : 'Weekly'} new ${hasAssetBreakdown ? 'tracked downloads' : 'downloads'} for ${project.name}`}
           >
+            {velocityView !== 'versions' && growthSeries.length > 1 && growthAverage !== null && growthAverage > 0 && (
+              <span
+                className="velocity-average"
+                style={{ '--avg': Math.min(growthAverage / maxGrowth, 1) } as CSSProperties}
+                aria-hidden="true"
+              ><b>avg {formatSignedNumber(Math.round(growthAverage))}</b></span>
+            )}
             {velocityView === 'versions'
               ? includedMix.length === 0
                 ? <div className="growth-placeholder">
@@ -1415,8 +1456,8 @@ export default function Home() {
                   }));
                   const released = releasesBetween(index > 0 ? includedMix[index - 1].t : day.t - INSIGHT_DAY_MS, day.t);
                   return (
-                    <div className="velocity-column" key={day.t} title={`${day.label}: ${segments.filter((segment) => segment.value).map((segment) => `${segment.label} ${segment.value}`).join(', ') || 'no downloads'}${released.length ? `. Released ${released.join(', ')}` : ''}`}>
-                      <span className="velocity-value">{released.length > 0 && <i className="release-dot" aria-label={`Released ${released.join(', ')}`} />}{day.total ? `+${formatNumber(day.total)}` : '0'}</span>
+                    <div className={`velocity-column${index === includedMix.length - 1 ? ' is-last' : ''}`} key={day.t} title={`${day.label}: ${segments.filter((segment) => segment.value).map((segment) => `${segment.label} ${segment.value}`).join(', ') || 'no downloads'}${released.length ? `. Released ${released.join(', ')}` : ''}`}>
+                      <span className="velocity-value">{released.length > 0 && <i className="release-dot" aria-label={`Released ${released.join(', ')}`} />}<span className="velocity-number">{day.total ? `+${formatNumber(day.total)}` : '0'}</span></span>
                       <span className="velocity-track">
                         <span className="velocity-stack" style={{ height: `${Math.max((day.total / maxMix) * 100, day.total ? 5 : 0)}%` }}>
                           {[...segments].reverse().filter((segment) => segment.value > 0).map((segment) => (
@@ -1443,12 +1484,12 @@ export default function Home() {
                 const isSpike = growthSpikes[index];
                 return (
                 <div
-                  className={`velocity-column${growthPeak?.capturedAt === point.capturedAt ? ' is-peak' : ''}${isSpike ? ' is-spike' : ''}`}
+                  className={`velocity-column${growthPeak?.capturedAt === point.capturedAt ? ' is-peak' : ''}${isSpike ? ' is-spike' : ''}${index === growthSeries.length - 1 ? ' is-last' : ''}`}
                   key={point.capturedAt}
                   title={`${point.label}: ${formatSignedNumber(point.value)} downloads${isSpike ? ' (unusually high)' : ''}${released.length ? `. Released ${released.join(', ')}` : ''}`}
                   aria-label={`${point.label}: ${point.value} new ${hasAssetBreakdown ? `tracked downloads, ${primaryDownloads} ${primaryAsset.label}, ${secondaryDownloads} ${secondaryAsset?.label}` : 'downloads'}${isSpike ? ', unusually high' : ''}${released.length ? `, released ${released.join(', ')}` : ''}`}
                 >
-                  <span className="velocity-value">{released.length > 0 && <i className="release-dot" aria-hidden="true" />}{formatSignedNumber(point.value)}{isSpike && <b className="spike-flag">Spike</b>}</span>
+                  <span className="velocity-value">{released.length > 0 && <i className="release-dot" aria-hidden="true" />}<span className="velocity-number">{formatSignedNumber(point.value)}</span>{isSpike && <b className="spike-flag">Spike</b>}</span>
                   <span className="velocity-track">
                     {showAssetStack
                       ? <span className="velocity-stack" style={{ height: `${Math.max((Math.abs(point.value) / maxGrowth) * 100, point.value ? 5 : 0)}%` }}>
@@ -1481,7 +1522,7 @@ export default function Home() {
                 <div><dt>Peak</dt><dd>{growthPeak ? <>{formatSignedNumber(growthPeak.value)}<small>{growthPeak.label}</small></> : '—'}</dd></div>
               </dl>
             )}
-            <p><i className="release-dot" aria-hidden="true" /> marks a day with a release. Hover a bar for details. History is captured daily at approximately 04:17 UTC.</p>
+            <p><i className="release-dot" aria-hidden="true" /> marks a day with a release. The dashed line is the average. Hover a bar for details. History is captured daily at approximately 04:17 UTC.</p>
           </aside>
         </div>
       </section>
@@ -1539,7 +1580,7 @@ export default function Home() {
               )}
               {!summary && <div className={`data-placeholder${isInitialLoad ? ' is-loading' : ''}`}>{emptyNote}</div>}
               {chartReleases.map((release) => {
-                const isLatest = release.version === releaseComparison?.latest.version;
+                const isLatest = release.version === (releaseComparison?.latest.version ?? latestChartVersion);
                 const value = chartValue(release);
                 const primaryDownloads = release.assets?.[primaryAsset.id]?.downloads ?? 0;
                 const secondaryDownloads = secondaryAsset ? release.assets?.[secondaryAsset.id]?.downloads ?? 0 : 0;
@@ -1554,7 +1595,7 @@ export default function Home() {
                         </span>
                       : <span className="bar-fill" style={{ height: `${Math.max((value / maxDownloads) * 100, value ? 7 : 0)}%` }} />}
                   </div>
-                  <span className={`bar-label${isLatest ? ' is-latest' : ''}`}>{release.version}</span>
+                  <span className={`bar-label${isLatest ? ' is-latest' : ''}`}><span className="bar-label-full">{release.version}</span><span className="bar-label-short" aria-hidden="true">{shortBarLabels.get(release.version) ?? release.version}</span></span>
                 </a>
                 );
               })}
@@ -1597,7 +1638,7 @@ export default function Home() {
             </div>
           </> : summary && shareSegments.length ? <>
             <div className="donut-wrap">
-              <div className="donut" style={{ background: conicGradient(shareSegments, shareColors, SHARE_TRACK_COLOR) }}>
+              <div className="donut" style={{ background: conicGradient(shareSegments, shareColors, SHARE_TRACK_COLOR, SHARE_GAP_DEG) }}>
                 <div><strong>{Math.round(shareSegments[0].share)}%</strong><span>{shareSegments[0].label}</span></div>
               </div>
             </div>
@@ -1682,7 +1723,7 @@ export default function Home() {
           </div>
           {starSeries.length >= 2
             ? <>
-                <LineChart label={`Cumulative GitHub stars for ${project.name}`} height={130} series={[{ id: 'stars', points: starSeries, color: '#0b8e81' }]} />
+                <LineChart label={`Cumulative GitHub stars for ${project.name}`} height={130} series={[{ id: 'stars', points: starSeries, color: '#3dbfa5', area: true }]} showEnd />
                 <div className="detail-axis"><span>{formatShortDate(new Date(starSeries[0].t).toISOString())}</span><span>Today</span></div>
               </>
             : <div className="insight-placeholder">Star history appears after the next daily capture.</div>}

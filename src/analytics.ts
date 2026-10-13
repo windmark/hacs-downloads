@@ -88,14 +88,24 @@ export function buildShareSegments(
   return segments;
 }
 
-export function conicGradient(segments: readonly { share: number }[], colors: readonly string[], track: string) {
+export function conicGradient(
+  segments: readonly { share: number }[],
+  colors: readonly string[],
+  track: string,
+  gapDeg = 0,
+  separator = '#fff',
+) {
   if (!segments.length) return `conic-gradient(${track} 0 360deg)`;
+  const gap = segments.length > 1 ? gapDeg : 0;
   let start = 0;
-  const stops = segments.map((segment, index) => {
+  const stops = segments.flatMap((segment, index) => {
     const end = start + segment.share * 3.6;
-    const stop = `${colors[index % colors.length]} ${start.toFixed(2)}deg ${end.toFixed(2)}deg`;
+    const colorEnd = Math.max(start, end - gap);
+    const color = colors[index % colors.length];
+    const entry = [`${color} ${start.toFixed(2)}deg ${colorEnd.toFixed(2)}deg`];
+    if (gap && colorEnd < end) entry.push(`${separator} ${colorEnd.toFixed(2)}deg ${end.toFixed(2)}deg`);
     start = end;
-    return stop;
+    return entry;
   });
   if (start < 359.99) stops.push(`${track} ${start.toFixed(2)}deg 360deg`);
   return `conic-gradient(${stops.join(', ')})`;

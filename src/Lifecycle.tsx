@@ -25,11 +25,14 @@ export function LineChart({
   height = 120,
   label,
   independentScales = false,
+  showEnd = false,
 }: {
-  series: Array<{ id: string; points: Point[]; color: string; dashed?: boolean }>;
+  series: Array<{ id: string; points: Point[]; color: string; dashed?: boolean; area?: boolean }>;
   height?: number;
   label: string;
   independentScales?: boolean;
+  /** Marks the last point of the first series with a dot and its value. */
+  showEnd?: boolean;
 }) {
   const width = 600;
   const all = series.flatMap((entry) => entry.points);
@@ -38,17 +41,40 @@ export function LineChart({
   const maxT = Math.max(...all.map((point) => point.t));
   const globalMax = Math.max(1, ...all.map((point) => point.v));
   const x = (t: number) => (maxT === minT ? 0 : ((t - minT) / (maxT - minT)) * width);
+  const scaleFor = (entry: (typeof series)[number]) => {
+    const max = independentScales ? Math.max(1, ...entry.points.map((point) => point.v)) : globalMax;
+    return (v: number) => height - 4 - (v / max) * (height - 10);
+  };
+  const endSeries = showEnd ? series[0] : undefined;
+  const endPoint = endSeries?.points.at(-1);
+  const endY = endSeries && endPoint ? scaleFor(endSeries)(endPoint.v) : null;
   return (
-    <svg className="line-chart" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" role="img" aria-label={label}>
-      <line x1="0" x2={width} y1={height - 1} y2={height - 1} className="line-chart-axis" />
-      <line x1="0" x2={width} y1={height / 2} y2={height / 2} className="line-chart-grid" />
-      {series.map((entry) => {
-        const max = independentScales ? Math.max(1, ...entry.points.map((point) => point.v)) : globalMax;
-        const y = (v: number) => height - 4 - (v / max) * (height - 10);
-        const path = entry.points.map((point, index) => `${index ? 'L' : 'M'}${x(point.t).toFixed(1)},${y(point.v).toFixed(1)}`).join(' ');
-        return <path d={path} fill="none" key={entry.id} stroke={entry.color} strokeDasharray={entry.dashed ? '6 5' : undefined} strokeWidth="2.5" vectorEffect="non-scaling-stroke" />;
-      })}
-    </svg>
+    <div className="line-chart-wrap">
+      <svg className="line-chart" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" role="img" aria-label={label}>
+        <line x1="0" x2={width} y1={height - 1} y2={height - 1} className="line-chart-axis" />
+        <line x1="0" x2={width} y1={height / 2} y2={height / 2} className="line-chart-grid" />
+        {series.map((entry) => {
+          const y = scaleFor(entry);
+          const path = entry.points.map((point, index) => `${index ? 'L' : 'M'}${x(point.t).toFixed(1)},${y(point.v).toFixed(1)}`).join(' ');
+          const first = entry.points[0];
+          const last = entry.points.at(-1);
+          return (
+            <g key={entry.id}>
+              {entry.area && first && last && (
+                <path d={`${path} L${x(last.t).toFixed(1)},${height - 1} L${x(first.t).toFixed(1)},${height - 1} Z`} fill={entry.color} fillOpacity="0.12" stroke="none" />
+              )}
+              <path d={path} fill="none" stroke={entry.color} strokeDasharray={entry.dashed ? '6 5' : undefined} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" vectorEffect="non-scaling-stroke" />
+            </g>
+          );
+        })}
+      </svg>
+      {endSeries && endPoint && endY !== null && (
+        <span className="line-chart-end" style={{ left: `${(x(endPoint.t) / width) * 100}%`, top: `${(endY / height) * 100}%` }} aria-hidden="true">
+          <i style={{ background: endSeries.color }} />
+          <b>{number(endPoint.v)}</b>
+        </span>
+      )}
+    </div>
   );
 }
 
@@ -90,7 +116,7 @@ export function LaunchHeatmap({ rows }: { rows: LaunchRow[] }) {
                   <td
                     className={`heat-cell${bucket.partial ? ' is-partial' : ''}${bucket.downloads === null ? ' is-empty' : ''}${intensity > 0.55 ? ' is-strong' : ''}`}
                     key={bucket.id}
-                    style={bucket.downloads ? { background: `rgb(25 198 173 / ${(0.1 + intensity * 0.75).toFixed(2)})` } : undefined}
+                    style={bucket.downloads ? { background: `rgb(61 191 165 / ${(0.1 + intensity * 0.7).toFixed(2)})` } : undefined}
                     title={bucket.partial ? `${bucket.label}: ${bucket.downloads} so far` : undefined}
                   >
                     {bucket.downloads === null ? '' : number(bucket.downloads)}
@@ -158,7 +184,7 @@ export function ReleaseDetail({
       <div className="release-detail-chart">
         <span className="detail-label">Cumulative downloads since publish</span>
         {curvePoints.length >= 2
-          ? <LineChart height={110} label={`Cumulative downloads of ${version}`} series={[{ id: version, points: curvePoints, color: '#0b8e81' }]} />
+          ? <LineChart height={110} label={`Cumulative downloads of ${version}`} series={[{ id: version, points: curvePoints, color: '#3dbfa5', area: true }]} showEnd />
           : <p className="detail-empty">Needs at least two daily snapshots.</p>}
         <div className="detail-axis"><span>{curve.available ? 'Publish' : 'Tracking start'}</span><span>{formatDays(curve.ageDays)} old</span></div>
       </div>

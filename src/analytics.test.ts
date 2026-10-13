@@ -80,6 +80,10 @@ describe('buildShareSegments', () => {
     expect(conicGradient([{ share: 50 }, { share: 50 }], ['red', 'blue'], 'grey'))
       .toBe('conic-gradient(red 0.00deg 180.00deg, blue 180.00deg 360.00deg)');
   });
+  it('separates segments with a gap', () => {
+    expect(conicGradient([{ share: 50 }, { share: 50 }], ['red', 'blue'], 'grey', 2))
+      .toBe('conic-gradient(red 0.00deg 178.00deg, #fff 178.00deg 180.00deg, blue 180.00deg 358.00deg, #fff 358.00deg 360.00deg)');
+  });
 });
 
 describe('sortReleases', () => {
