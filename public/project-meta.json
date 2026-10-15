@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-10-14T09:29:16.805Z",
+  "updatedAt": "2026-10-15T09:07:03.479Z",
   "projects": {
     "ef-powerocean-tcpmodbus": {
       "releases": {
@@ -124,6 +124,12 @@
         }
       },
       "issues": [
+        {
+          "number": 169,
+          "title": "Values reported by the Integration differs from the Ecoflow App",
+          "createdAt": "2026-10-14T17:54:52Z",
+          "url": "https://github.com/MaxGrmm/EF-PowerOcean-TcpModbus/issues/169"
+        },
         {
           "number": 144,
           "title": "OCEAN 2 Plus: Charge Battery power decreases with household load instead of maintaining requested ch",
