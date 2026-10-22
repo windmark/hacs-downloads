@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-10-21T09:20:09.736Z",
+  "updatedAt": "2026-10-22T09:22:57.015Z",
   "projects": {
     "ef-powerocean-tcpmodbus": {
       "releases": {
@@ -91,7 +91,9 @@
         "v2.9.1-beta.4": "2026-10-17T16:17:00Z",
         "v2.9.2-beta.2": "2026-10-18T21:22:47Z",
         "v2.9.2-beta.1": "2026-10-18T20:22:01Z",
-        "v2.9.2-beta.3": "2026-10-19T18:59:59Z"
+        "v2.9.2-beta.3": "2026-10-19T18:59:59Z",
+        "v2.9.2": "2026-10-21T13:51:41Z",
+        "v2.9.2-beta.4": "2026-10-21T13:45:55Z"
       },
       "stars": {
         "total": 32,
@@ -129,6 +131,12 @@
         }
       },
       "issues": [
+        {
+          "number": 182,
+          "title": "Energy totals held for over a day: inverter_ac_in_total, inverter_ac_out_total, solar_total",
+          "createdAt": "2026-10-21T21:02:44Z",
+          "url": "https://github.com/MaxGrmm/EF-PowerOcean-TcpModbus/issues/182"
+        },
         {
           "number": 169,
           "title": "Values reported by the Integration differs from the Ecoflow App",
