@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-10-22T09:22:57.015Z",
+  "updatedAt": "2026-10-23T09:18:35.466Z",
   "projects": {
     "ef-powerocean-tcpmodbus": {
       "releases": {
@@ -93,7 +93,8 @@
         "v2.9.2-beta.1": "2026-10-18T20:22:01Z",
         "v2.9.2-beta.3": "2026-10-19T18:59:59Z",
         "v2.9.2": "2026-10-21T13:51:41Z",
-        "v2.9.2-beta.4": "2026-10-21T13:45:55Z"
+        "v2.9.2-beta.4": "2026-10-21T13:45:55Z",
+        "v2.9.3-beta.1": "2026-10-23T08:29:46Z"
       },
       "stars": {
         "total": 32,
@@ -461,7 +462,27 @@
           "createdAt": "2026-03-27T08:53:05Z",
           "url": "https://github.com/MaxGrmm/EF-PowerOcean-TcpModbus/issues/1"
         }
-      ]
+      ],
+      "installs": {
+        "domain": "ef_powerocean_tcpmodbus",
+        "history": {
+          "2026-10-23": {
+            "total": 40,
+            "versions": {
+              "2.9.2": 16,
+              "2.9.1": 7,
+              "2.4.3": 4,
+              "2.9.0": 5,
+              "2.0.1": 1,
+              "2.0.5-PreRelease": 1,
+              "2.5.0": 1,
+              "2.3.0": 1,
+              "2.0.0": 2,
+              "2.8.1": 2
+            }
+          }
+        }
+      }
     }
   }
 }
