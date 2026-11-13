@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-11-12T12:37:59.796Z",
+  "updatedAt": "2026-11-13T12:08:23.020Z",
   "projects": {
     "ef-powerocean-tcpmodbus": {
       "releases": {
@@ -147,6 +147,12 @@
         }
       },
       "issues": [
+        {
+          "number": 218,
+          "title": "Ocean 2 (FW 1.0.3.173): grid import/export energy registers always 0",
+          "createdAt": "2026-11-12T19:44:42Z",
+          "url": "https://github.com/MaxGrmm/EF-PowerOcean-TcpModbus/issues/218"
+        },
         {
           "number": 200,
           "title": "Battery SOC reads 0% while the individual batteries read about 99%",
@@ -811,6 +817,20 @@
             "versions": {
               "2.9.5": 35,
               "2.9.4": 5,
+              "2.9.3": 2,
+              "2.0.1": 1,
+              "2.0.5-PreRelease": 1,
+              "2.5.0": 1,
+              "2.3.0": 1,
+              "2.4.3": 2,
+              "2.8.1": 1
+            }
+          },
+          "2026-11-13": {
+            "total": 52,
+            "versions": {
+              "2.9.5": 40,
+              "2.9.4": 3,
               "2.9.3": 2,
               "2.0.1": 1,
               "2.0.5-PreRelease": 1,
