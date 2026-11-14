@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-11-13T12:08:23.020Z",
+  "updatedAt": "2026-11-14T11:25:31.141Z",
   "projects": {
     "ef-powerocean-tcpmodbus": {
       "releases": {
@@ -109,7 +109,8 @@
         "v2.9.5-beta.1": "2026-10-28T19:04:30Z",
         "v2.9.5-beta.3": "2026-10-29T18:26:18Z",
         "v2.9.5-beta.4": "2026-11-03T09:17:45Z",
-        "v2.9.5": "2026-11-04T20:17:36Z"
+        "v2.9.5": "2026-11-04T20:17:36Z",
+        "v2.9.6-beta.1": "2026-11-13T17:51:23Z"
       },
       "stars": {
         "total": 32,
@@ -147,6 +148,12 @@
         }
       },
       "issues": [
+        {
+          "number": 219,
+          "title": "Entities stay unavailable after a start whose first read fails, until their value next changes (2.9.",
+          "createdAt": "2026-11-13T14:55:05Z",
+          "url": "https://github.com/MaxGrmm/EF-PowerOcean-TcpModbus/issues/219"
+        },
         {
           "number": 218,
           "title": "Ocean 2 (FW 1.0.3.173): grid import/export energy registers always 0",
@@ -827,6 +834,20 @@
             }
           },
           "2026-11-13": {
+            "total": 52,
+            "versions": {
+              "2.9.5": 40,
+              "2.9.4": 3,
+              "2.9.3": 2,
+              "2.0.1": 1,
+              "2.0.5-PreRelease": 1,
+              "2.5.0": 1,
+              "2.3.0": 1,
+              "2.4.3": 2,
+              "2.8.1": 1
+            }
+          },
+          "2026-11-14": {
             "total": 52,
             "versions": {
               "2.9.5": 40,
