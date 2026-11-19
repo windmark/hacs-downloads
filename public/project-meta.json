@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-11-18T12:59:33.528Z",
+  "updatedAt": "2026-11-19T12:57:24.261Z",
   "projects": {
     "ef-powerocean-tcpmodbus": {
       "releases": {
@@ -110,7 +110,9 @@
         "v2.9.5-beta.3": "2026-10-29T18:26:18Z",
         "v2.9.5-beta.4": "2026-11-03T09:17:45Z",
         "v2.9.5": "2026-11-04T20:17:36Z",
-        "v2.9.6-beta.1": "2026-11-13T17:51:23Z"
+        "v2.9.6-beta.1": "2026-11-13T17:51:23Z",
+        "v2.10.0-beta.2": "2026-11-18T22:14:31Z",
+        "v2.10.0-beta.1": "2026-11-18T21:40:28Z"
       },
       "stars": {
         "total": 32,
@@ -148,6 +150,12 @@
         }
       },
       "issues": [
+        {
+          "number": 222,
+          "title": "No connection to Powerocean Single Phase after upgrade to FW 6.50.99.170",
+          "createdAt": "2026-11-18T14:09:59Z",
+          "url": "https://github.com/MaxGrmm/EF-PowerOcean-TcpModbus/issues/222"
+        },
         {
           "number": 219,
           "title": "Entities stay unavailable after a start whose first read fails, until their value next changes (2.9.",
@@ -907,6 +915,20 @@
             "total": 52,
             "versions": {
               "2.9.5": 42,
+              "2.9.4": 1,
+              "2.9.3": 2,
+              "2.0.1": 1,
+              "2.0.5-PreRelease": 1,
+              "2.5.0": 1,
+              "2.3.0": 1,
+              "2.4.3": 2,
+              "2.8.1": 1
+            }
+          },
+          "2026-11-19": {
+            "total": 53,
+            "versions": {
+              "2.9.5": 43,
               "2.9.4": 1,
               "2.9.3": 2,
               "2.0.1": 1,
