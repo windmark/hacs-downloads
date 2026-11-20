@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-11-19T12:57:24.261Z",
+  "updatedAt": "2026-11-20T12:49:42.621Z",
   "projects": {
     "ef-powerocean-tcpmodbus": {
       "releases": {
@@ -112,7 +112,16 @@
         "v2.9.5": "2026-11-04T20:17:36Z",
         "v2.9.6-beta.1": "2026-11-13T17:51:23Z",
         "v2.10.0-beta.2": "2026-11-18T22:14:31Z",
-        "v2.10.0-beta.1": "2026-11-18T21:40:28Z"
+        "v2.10.0-beta.1": "2026-11-18T21:40:28Z",
+        "v2.10.0": "2026-11-20T10:38:30Z",
+        "v2.10.0-beta.9": "2026-11-20T07:02:40Z",
+        "v2.10.0-beta.8": "2026-11-20T06:36:12Z",
+        "v2.10.0-beta.10": "2026-11-20T07:55:50Z",
+        "v2.10.0-beta.7": "2026-11-19T22:01:24Z",
+        "v2.10.0-beta.6": "2026-11-19T21:37:29Z",
+        "v2.10.0-beta.5": "2026-11-19T21:22:21Z",
+        "v2.10.0-beta.4": "2026-11-19T20:23:42Z",
+        "v2.10.0-beta.3": "2026-11-19T15:51:52Z"
       },
       "stars": {
         "total": 32,
@@ -150,6 +159,12 @@
         }
       },
       "issues": [
+        {
+          "number": 227,
+          "title": "v2.9.5 – Modbus values stop updating and unexpected FC16 write with control disabled",
+          "createdAt": "2026-11-19T15:23:08Z",
+          "url": "https://github.com/MaxGrmm/EF-PowerOcean-TcpModbus/issues/227"
+        },
         {
           "number": 222,
           "title": "No connection to Powerocean Single Phase after upgrade to FW 6.50.99.170",
@@ -926,6 +941,20 @@
             }
           },
           "2026-11-19": {
+            "total": 53,
+            "versions": {
+              "2.9.5": 43,
+              "2.9.4": 1,
+              "2.9.3": 2,
+              "2.0.1": 1,
+              "2.0.5-PreRelease": 1,
+              "2.5.0": 1,
+              "2.3.0": 1,
+              "2.4.3": 2,
+              "2.8.1": 1
+            }
+          },
+          "2026-11-20": {
             "total": 53,
             "versions": {
               "2.9.5": 43,
