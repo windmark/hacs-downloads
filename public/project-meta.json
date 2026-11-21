@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-11-20T12:49:42.621Z",
+  "updatedAt": "2026-11-21T12:35:14.631Z",
   "projects": {
     "ef-powerocean-tcpmodbus": {
       "releases": {
@@ -159,6 +159,12 @@
         }
       },
       "issues": [
+        {
+          "number": 237,
+          "title": "Many reading errors with Power Ocean",
+          "createdAt": "2026-11-21T10:27:03Z",
+          "url": "https://github.com/MaxGrmm/EF-PowerOcean-TcpModbus/issues/237"
+        },
         {
           "number": 227,
           "title": "v2.9.5 – Modbus values stop updating and unexpected FC16 write with control disabled",
@@ -966,6 +972,21 @@
               "2.3.0": 1,
               "2.4.3": 2,
               "2.8.1": 1
+            }
+          },
+          "2026-11-21": {
+            "total": 53,
+            "versions": {
+              "2.9.5": 42,
+              "2.9.4": 1,
+              "2.9.3": 2,
+              "2.0.1": 1,
+              "2.0.5-PreRelease": 1,
+              "2.5.0": 1,
+              "2.3.0": 1,
+              "2.4.3": 2,
+              "2.8.1": 1,
+              "2.10.0": 1
             }
           }
         }
