@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-11-21T12:35:14.631Z",
+  "updatedAt": "2026-11-22T12:31:35.897Z",
   "projects": {
     "ef-powerocean-tcpmodbus": {
       "releases": {
@@ -121,7 +121,14 @@
         "v2.10.0-beta.6": "2026-11-19T21:37:29Z",
         "v2.10.0-beta.5": "2026-11-19T21:22:21Z",
         "v2.10.0-beta.4": "2026-11-19T20:23:42Z",
-        "v2.10.0-beta.3": "2026-11-19T15:51:52Z"
+        "v2.10.0-beta.3": "2026-11-19T15:51:52Z",
+        "v2.10.2-beta.4": "2026-11-22T11:33:24Z",
+        "v2.10.2-beta.3": "2026-11-22T08:58:25Z",
+        "v2.10.2-beta.2": "2026-11-21T20:47:18Z",
+        "v2.10.2-beta.1": "2026-11-21T20:05:48Z",
+        "v2.10.1": "2026-11-21T13:35:14Z",
+        "v2.10.1-beta.2": "2026-11-21T13:21:50Z",
+        "v2.10.1-beta.1": "2026-11-21T13:04:53Z"
       },
       "stars": {
         "total": 32,
@@ -159,6 +166,12 @@
         }
       },
       "issues": [
+        {
+          "number": 240,
+          "title": "Phasenspannung und -strom am Netzanschluss (L1–L3) bei PowerOcean Plus immer 0, obwohl Netzleistung ",
+          "createdAt": "2026-11-21T17:36:43Z",
+          "url": "https://github.com/MaxGrmm/EF-PowerOcean-TcpModbus/issues/240"
+        },
         {
           "number": 237,
           "title": "Many reading errors with Power Ocean",
@@ -987,6 +1000,21 @@
               "2.4.3": 2,
               "2.8.1": 1,
               "2.10.0": 1
+            }
+          },
+          "2026-11-22": {
+            "total": 55,
+            "versions": {
+              "2.10.0": 18,
+              "2.9.5": 27,
+              "2.9.4": 1,
+              "2.9.3": 2,
+              "2.0.1": 1,
+              "2.0.5-PreRelease": 1,
+              "2.5.0": 1,
+              "2.3.0": 1,
+              "2.4.3": 2,
+              "2.8.1": 1
             }
           }
         }
