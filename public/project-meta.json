@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-11-26T13:50:32.681Z",
+  "updatedAt": "2026-11-27T13:47:40.560Z",
   "projects": {
     "ef-powerocean-tcpmodbus": {
       "releases": {
@@ -130,7 +130,9 @@
         "v2.10.1-beta.2": "2026-11-21T13:21:50Z",
         "v2.10.1-beta.1": "2026-11-21T13:04:53Z",
         "v2.11.0-beta.1": "2026-11-22T16:56:23Z",
-        "v2.11.0-beta.2": "2026-11-26T09:27:23Z"
+        "v2.11.0-beta.2": "2026-11-26T09:27:23Z",
+        "v2.12.0-beta.1": "2026-11-27T08:25:49Z",
+        "v2.11.0": "2026-11-26T21:40:54Z"
       },
       "stars": {
         "total": 32,
@@ -168,6 +170,12 @@
         }
       },
       "issues": [
+        {
+          "number": 251,
+          "title": "OCEAN 2 Three-Phase Batteries not detected & no grid energy counted",
+          "createdAt": "2026-11-26T14:45:30Z",
+          "url": "https://github.com/MaxGrmm/EF-PowerOcean-TcpModbus/issues/251"
+        },
         {
           "number": 240,
           "title": "Phasenspannung und -strom am Netzanschluss (L1–L3) bei PowerOcean Plus immer 0, obwohl Netzleistung ",
@@ -1081,6 +1089,23 @@
               "2.10.0": 1,
               "2.4.3": 2,
               "2.8.1": 1
+            }
+          },
+          "2026-11-27": {
+            "total": 57,
+            "versions": {
+              "2.10.1": 35,
+              "2.9.5": 10,
+              "2.9.4": 1,
+              "2.9.3": 2,
+              "2.0.1": 1,
+              "2.0.5-PreRelease": 1,
+              "2.5.0": 1,
+              "2.3.0": 1,
+              "2.10.0": 1,
+              "2.4.3": 2,
+              "2.8.1": 1,
+              "2.11.0": 1
             }
           }
         }
